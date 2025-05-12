@@ -5,22 +5,23 @@ import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
-    useColorScheme,
+	ActivityIndicator,
+	Alert,
+	FlatList,
+	Modal,
+	ScrollView,
+	StyleSheet,
+	TextInput,
+	TouchableOpacity,
+	View,
+	useColorScheme,
 } from "react-native";
 import {
-    type Transaction,
-    addTransacao,
-    deleteTransacao,
-    getTransacoes,
-    updateTransacao,
+	type Transaction,
+	addTransacao,
+	deleteTransacao,
+	getTransacoes,
+	updateTransacao,
 } from "../supabaseClient";
 
 const CATEGORIAS_DESPESA = [
@@ -56,7 +57,12 @@ export default function TransactionsScreen() {
 	const [modalVisible, setModalVisible] = useState(false);
 	const [editing, setEditing] = useState<Transaction | null>(null);
 	const [form, setForm] = useState<
-		Omit<Transaction, "id"> & { source?: string; amountStr?: string }
+		Omit<Transaction, "id"> & { 
+			source?: string; 
+			amountStr?: string;
+			notes?: string;
+			is_recurring?: boolean;
+		}
 	>({
 		title: "",
 		amount: 0,
@@ -65,6 +71,8 @@ export default function TransactionsScreen() {
 		category: "",
 		date: new Date().toISOString().slice(0, 10),
 		source: "",
+		notes: "",
+		is_recurring: false,
 	});
 	const [saving, setSaving] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
@@ -99,6 +107,8 @@ export default function TransactionsScreen() {
 			category: "",
 			date: new Date().toISOString().slice(0, 10),
 			source: "",
+			notes: "",
+			is_recurring: false,
 		});
 		setModalVisible(true);
 	};
@@ -116,6 +126,8 @@ export default function TransactionsScreen() {
 				"source" in tx
 					? ((tx as Record<string, unknown>).source as string) || ""
 					: "",
+			notes: tx.notes || "",
+			is_recurring: tx.is_recurring || false,
 		});
 		setModalVisible(true);
 	};
@@ -143,7 +155,12 @@ export default function TransactionsScreen() {
 			const valorFloat = form.amountStr
 				? Number.parseFloat(form.amountStr.replace(",", "."))
 				: 0;
-			const payload = { ...form, amount: valorFloat };
+			const payload = { 
+				...form, 
+				amount: valorFloat,
+				notes: form.notes || undefined,
+				is_recurring: form.is_recurring || false,
+			};
 			if (editing?.id) {
 				await updateTransacao(editing.id, payload);
 			} else {
@@ -314,131 +331,160 @@ export default function TransactionsScreen() {
 							borderRadius: 16,
 							padding: 24,
 							width: "90%",
+							maxHeight: "80%",
 						}}
 					>
-						<ThemedText
-							style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}
-						>
-							{editing ? "Editar" : "Nova"} Transação
-						</ThemedText>
-						<TextInput
-							style={styles.input}
-							placeholder="Título"
-							value={form.title}
-							onChangeText={(v) => setForm((f) => ({ ...f, title: v }))}
-						/>
-						{form.type === "income" ? (
+						<ScrollView>
+							<ThemedText
+								style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}
+							>
+								{editing ? "Editar" : "Nova"} Transação
+							</ThemedText>
+
 							<TextInput
 								style={styles.input}
-								placeholder="Origem (ex: Salário, Investimentos)"
-								value={form.source || ""}
-								onChangeText={(v) =>
-									setForm((f) => ({ ...f, source: v, category: v }))
-								}
+								placeholder="Título"
+								value={form.title}
+								onChangeText={(v) => setForm((f) => ({ ...f, title: v }))}
 							/>
-						) : (
-							<Picker
-								selectedValue={form.category}
-								onValueChange={(v: string) =>
-									setForm((f) => ({ ...f, category: v }))
-								}
-								style={{ marginBottom: 16 }}
-							>
-								<Picker.Item label="Selecione uma categoria" value="" />
-								{CATEGORIAS_DESPESA.map((cat) => (
-									<Picker.Item
-										key={cat.value}
-										label={cat.label}
-										value={cat.value}
-									/>
-								))}
-							</Picker>
-						)}
-						<TextInput
-							style={styles.input}
-							placeholder="Valor"
-							value={form.amountStr ?? ""}
-							onChangeText={(v) => {
-								// Aceita ponto ou vírgula, remove caracteres inválidos, limita a 2 casas decimais
-								let valor = v.replace(/[^0-9.,]/g, "");
-								// Limita a 2 casas decimais
-								const match = valor.match(/^(\d*)([.,]?(\d{0,2})?)?/);
-								if (match) valor = match[1] + (match[2] || "");
-								setForm((f) => ({ ...f, amountStr: valor }));
-							}}
-							keyboardType="decimal-pad"
-						/>
-						<View style={{ flexDirection: "row", marginVertical: 8 }}>
-							<TouchableOpacity
-								style={[
-									styles.typeButton,
-									form.type === "income" && { backgroundColor: theme.tint },
-								]}
-								onPress={() => setForm((f) => ({ ...f, type: "income" }))}
-							>
-								<ThemedText
-									style={[
-										styles.typeButtonText,
-										form.type === "income" && { color: "#fff" },
-									]}
+
+							{form.type === "income" ? (
+								<TextInput
+									style={styles.input}
+									placeholder="Origem (ex: Salário, Investimentos)"
+									value={form.source || ""}
+									onChangeText={(v) =>
+										setForm((f) => ({ ...f, source: v, category: v }))
+									}
+								/>
+							) : (
+								<Picker
+									selectedValue={form.category}
+									onValueChange={(v: string) =>
+										setForm((f) => ({ ...f, category: v }))
+									}
+									style={{ marginBottom: 16 }}
 								>
-									Receita
-								</ThemedText>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={[
-									styles.typeButton,
-									form.type === "expense" && { backgroundColor: theme.error },
-								]}
-								onPress={() => setForm((f) => ({ ...f, type: "expense" }))}
-							>
-								<ThemedText
-									style={[
-										styles.typeButtonText,
-										form.type === "expense" && { color: "#fff" },
-									]}
-								>
-									Despesa
-								</ThemedText>
-							</TouchableOpacity>
-						</View>
-						<TextInput
-							style={styles.input}
-							placeholder="Data (YYYY-MM-DD)"
-							value={form.date}
-							onChangeText={(v) => setForm((f) => ({ ...f, date: v }))}
-						/>
-						{formError ? (
-							<ThemedText style={{ color: theme.error, marginBottom: 8 }}>{formError}</ThemedText>
-						) : null}
-						<View
-							style={{
-								flexDirection: "row",
-								justifyContent: "flex-end",
-								marginTop: 16,
-							}}
-						>
-							<TouchableOpacity
-								onPress={() => setModalVisible(false)}
-								style={{ marginRight: 16 }}
-							>
-								<ThemedText style={{ color: theme.error }}>Cancelar</ThemedText>
-							</TouchableOpacity>
-							<TouchableOpacity
-								onPress={handleSave}
-								disabled={saving}
-								style={{
-									backgroundColor: theme.tint,
-									borderRadius: 8,
-									paddingHorizontal: 18,
-									paddingVertical: 8,
+									<Picker.Item label="Selecione uma categoria" value="" />
+									{CATEGORIAS_DESPESA.map((cat) => (
+										<Picker.Item
+											key={cat.value}
+											label={cat.label}
+											value={cat.value}
+										/>
+									))}
+								</Picker>
+							)}
+
+							<TextInput
+								style={styles.input}
+								placeholder="Valor"
+								value={form.amountStr ?? ""}
+								onChangeText={(v) => {
+									let valor = v.replace(/[^0-9.,]/g, "");
+									const match = valor.match(/^(\d*)([.,]?(\d{0,2})?)?/);
+									if (match) valor = match[1] + (match[2] || "");
+									setForm((f) => ({ ...f, amountStr: valor }));
 								}}
-							>
-								<ThemedText style={{ color: "#fff", fontWeight: "bold" }}>
-									{saving ? "Salvando..." : "Salvar"}
+								keyboardType="decimal-pad"
+							/>
+
+							<TextInput
+								style={styles.input}
+								placeholder="Data (YYYY-MM-DD)"
+								value={form.date}
+								onChangeText={(v) => setForm((f) => ({ ...f, date: v }))}
+							/>
+
+							{form.type === "expense" && (
+								<TextInput
+									style={styles.input}
+									placeholder="Observações (opcional)"
+									value={form.notes || ""}
+									onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))}
+									multiline
+									numberOfLines={3}
+								/>
+							)}
+
+							<View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+								<TouchableOpacity
+									style={[
+										styles.checkbox,
+										form.is_recurring && { backgroundColor: theme.tint },
+									]}
+									onPress={() =>
+										setForm((f) => ({ ...f, is_recurring: !f.is_recurring }))
+									}
+								>
+									{form.is_recurring && (
+										<Ionicons name="checkmark" size={16} color="#fff" />
+									)}
+								</TouchableOpacity>
+								<ThemedText style={{ marginLeft: 8 }}>Transação recorrente</ThemedText>
+							</View>
+
+							<View style={{ flexDirection: "row", marginVertical: 8 }}>
+								<TouchableOpacity
+									style={[
+										styles.typeButton,
+										form.type === "income" && { backgroundColor: theme.tint },
+									]}
+									onPress={() => setForm((f) => ({ ...f, type: "income" }))}
+								>
+									<ThemedText
+										style={[
+											styles.typeButtonText,
+											form.type === "income" && { color: "#fff" },
+										]}
+									>
+										Receita
+									</ThemedText>
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={[
+										styles.typeButton,
+										form.type === "expense" && { backgroundColor: theme.tint },
+									]}
+									onPress={() => setForm((f) => ({ ...f, type: "expense" }))}
+								>
+									<ThemedText
+										style={[
+											styles.typeButtonText,
+											form.type === "expense" && { color: "#fff" },
+										]}
+									>
+										Despesa
+									</ThemedText>
+								</TouchableOpacity>
+							</View>
+
+							{formError && (
+								<ThemedText style={{ color: "red", marginBottom: 16 }}>
+									{formError}
 								</ThemedText>
-							</TouchableOpacity>
-						</View>
+							)}
+
+							<View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
+								<TouchableOpacity
+									style={[styles.button, { backgroundColor: "#ccc" }]}
+									onPress={() => setModalVisible(false)}
+								>
+									<ThemedText style={{ color: "#fff" }}>Cancelar</ThemedText>
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={[styles.button, { backgroundColor: theme.tint }]}
+									onPress={handleSave}
+									disabled={saving}
+								>
+									{saving ? (
+										<ActivityIndicator color="#fff" />
+									) : (
+										<ThemedText style={{ color: "#fff" }}>Salvar</ThemedText>
+									)}
+								</TouchableOpacity>
+							</View>
+						</ScrollView>
 					</View>
 				</View>
 			</Modal>
@@ -560,5 +606,21 @@ const styles = StyleSheet.create({
 	typeButtonText: {
 		fontSize: 14,
 		fontWeight: "bold",
+	},
+	checkbox: {
+		width: 24,
+		height: 24,
+		borderRadius: 4,
+		borderWidth: 2,
+		borderColor: "#ccc",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	button: {
+		paddingHorizontal: 16,
+		paddingVertical: 8,
+		borderRadius: 8,
+		minWidth: 80,
+		alignItems: "center",
 	},
 });

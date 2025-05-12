@@ -13,7 +13,36 @@ export type Transaction = {
 	category: string;
 	date: string;
 	user_id?: string;
+	description?: string;
+	source?: string;
+	notes?: string;
+	is_recurring?: boolean;
 };
+
+export interface IncomeTransaction {
+	id?: string;
+	description: string;
+	amount: number;
+	source: string;
+	date: string;
+	is_recurring?: boolean;
+	created_at?: string;
+	user_id?: string;
+	type: 'income';
+}
+
+export interface ExpenseTransaction {
+	id?: string;
+	description: string;
+	amount: number;
+	category: string;
+	date: string;
+	notes?: string;
+	is_recurring?: boolean;
+	created_at?: string;
+	user_id?: string;
+	type: 'expense';
+}
 
 export const getToken = async () => {
 	return await SecureStore.getItemAsync("supabase_token");
@@ -72,6 +101,14 @@ export const addTransacao = async (
 	const token = await getToken();
 	const userId = await getUserId();
 	if (!userId) throw new Error("Usuário não autenticado");
+
+	// Validação básica
+	if (!transacao.title?.trim()) throw new Error("Título é obrigatório");
+	if (!transacao.amount || transacao.amount <= 0) throw new Error("Valor inválido");
+	if (!transacao.date?.trim()) throw new Error("Data é obrigatória");
+	if (transacao.type === "income" && !transacao.source?.trim()) throw new Error("Origem é obrigatória");
+	if (transacao.type === "expense" && !transacao.category?.trim()) throw new Error("Categoria é obrigatória");
+
 	try {
 		const table = transacao.type === "expense" ? "expenses" : "incomes";
 		// Monta o objeto a ser enviado
@@ -80,19 +117,18 @@ export const addTransacao = async (
 			description: transacao.title,
 			amount: Number.parseFloat(String(transacao.amount)),
 			date: transacao.date,
+			is_recurring: transacao.is_recurring || false,
 		};
+
 		if (transacao.type === "expense") {
 			payload.category = transacao.category;
+			if (transacao.notes) payload.notes = transacao.notes;
 		}
+
 		if (transacao.type === "income" && transacao.source) {
 			payload.source = transacao.source;
 		}
-		if (transacao.notes) {
-			payload.notes = transacao.notes;
-		}
-		if ('is_recurring' in transacao && typeof transacao.is_recurring !== "undefined") {
-			payload.is_recurring = transacao.is_recurring;
-		}
+
 		const { data } = await axios.post(
 			`${supabaseUrl}/rest/v1/${table}`,
 			[payload],
@@ -105,7 +141,12 @@ export const addTransacao = async (
 				},
 			},
 		);
-		return { ...data[0], type: transacao.type };
+
+		return { 
+			...data[0], 
+			type: transacao.type,
+			title: data[0].description,
+		};
 	} catch (error: unknown) {
 		if (error && typeof error === "object" && "response" in error) {
 			const axiosError = error as {
@@ -121,12 +162,29 @@ export const addTransacao = async (
 
 export const updateTransacao = async (
 	id: string,
-	transacao: Partial<Transaction> & { source?: string; notes?: string; amountStr?: string }
+	transacao: Partial<Transaction> & { 
+		source?: string; 
+		notes?: string; 
+		amountStr?: string;
+		is_recurring?: boolean;
+	}
 ): Promise<Transaction> => {
 	const token = await getToken();
 	const userId = await getUserId();
 	if (!userId) throw new Error("Usuário não autenticado");
+
+	// Validação básica
+	if (transacao.title && !transacao.title.trim()) throw new Error("Título é obrigatório");
+	if (transacao.amountStr && (Number.isNaN(Number(transacao.amountStr.replace(",", "."))) || Number(transacao.amountStr.replace(",", ".")) <= 0)) 
+		throw new Error("Valor inválido");
+	if (transacao.date && !transacao.date.trim()) throw new Error("Data é obrigatória");
+	if (transacao.type === "income" && transacao.source && !transacao.source.trim()) 
+		throw new Error("Origem é obrigatória");
+	if (transacao.type === "expense" && transacao.category && !transacao.category.trim()) 
+		throw new Error("Categoria é obrigatória");
+
 	const table = transacao.type === "expense" ? "expenses" : "incomes";
+	
 	// Monta o objeto a ser enviado
 	const payload: Record<string, unknown> = {
 		description: transacao.title,
@@ -135,19 +193,20 @@ export const updateTransacao = async (
 			: Number.parseFloat(String(transacao.amount)),
 		date: transacao.date,
 		user_id: userId,
+		is_recurring: transacao.is_recurring || false,
 	};
+
 	if (transacao.type === "expense") {
 		payload.category = transacao.category;
 		if (transacao.notes) payload.notes = transacao.notes;
 	}
+
 	if (transacao.type === "income" && transacao.source) {
 		payload.source = transacao.source;
 		// Para receitas, garantir que category seja igual a source
 		payload.category = transacao.source;
 	}
-	if ('is_recurring' in transacao && typeof transacao.is_recurring !== "undefined") {
-		payload.is_recurring = transacao.is_recurring;
-	}
+
 	const { data } = await axios.patch(
 		`${supabaseUrl}/rest/v1/${table}?id=eq.${id}&user_id=eq.${userId}`,
 		payload,
@@ -160,7 +219,12 @@ export const updateTransacao = async (
 			},
 		}
 	);
-	return { ...data[0], type: transacao.type };
+
+	return { 
+		...data[0], 
+		type: transacao.type,
+		title: data[0].description,
+	};
 };
 
 export const deleteTransacao = async (
