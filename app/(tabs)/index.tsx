@@ -6,6 +6,7 @@ import React, { useState } from "react";
 import {
 	ActivityIndicator,
 	Modal,
+	SafeAreaView,
 	ScrollView,
 	StyleSheet,
 	TextInput,
@@ -123,6 +124,7 @@ export default function DashboardScreen() {
 	const handleDelete = async (id: string, type: "income" | "expense") => {
 		try {
 			await remove(id, type);
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		} catch (e) {
 			alert("Erro ao excluir transação.");
 		}
@@ -138,402 +140,404 @@ export default function DashboardScreen() {
 	const balance = totalIncome - totalExpense;
 
 	return (
-		<View style={[styles.container, { backgroundColor: theme.background }]}>
-			{/* Top Bar */}
-			<View style={styles.topBar}>
-				<ThemedText style={[styles.topBarTitle, { color: theme.text }]}>
-					Principal
-				</ThemedText>
-				<View style={styles.topBarIcons}>
-					<TouchableOpacity style={styles.topBarIconBtn}>
-						<Ionicons
-							name="notifications-outline"
-							size={22}
-							color={theme.tint}
-						/>
-						<View
-							style={[
-								styles.notificationBadge,
-								{ backgroundColor: theme.tint },
-							]}
-						>
-							<ThemedText style={styles.badgeText}>1</ThemedText>
-						</View>
-					</TouchableOpacity>
-					<TouchableOpacity style={styles.topBarIconBtn}>
-						<Ionicons name="settings-outline" size={22} color={theme.tint} />
-					</TouchableOpacity>
-				</View>
-			</View>
-			<ScrollView
-				contentContainerStyle={styles.scrollContent}
-				showsVerticalScrollIndicator={false}
-			>
-				{/* Card de Saldo */}
-				<View style={[styles.balanceCard, { backgroundColor: theme.card }]}>
-					<ThemedText style={[styles.balanceLabel, { color: theme.gray }]}>
-						Saldo em contas
+		<SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
+			<View style={[styles.container, { backgroundColor: theme.background }]}>
+				{/* Top Bar */}
+				<View style={styles.topBar}>
+					<ThemedText style={[styles.topBarTitle, { color: theme.text }]}>
+						Principal
 					</ThemedText>
-					<ThemedText style={[styles.balanceValue, { color: theme.text }]}>
-						R$ {balance.toFixed(2)}
-					</ThemedText>
-					<View style={styles.balanceRow}>
-						<View style={styles.balanceItem}>
+					<View style={styles.topBarIcons}>
+						<TouchableOpacity style={styles.topBarIconBtn}>
 							<Ionicons
-								name="arrow-up-circle-outline"
-								size={20}
+								name="notifications-outline"
+								size={22}
 								color={theme.tint}
 							/>
-							<ThemedText style={[styles.incomeLabel, { color: theme.gray }]}>
-								Receitas
-							</ThemedText>
-							<ThemedText style={[styles.incomeValue, { color: theme.tint }]}>
-								R$ {totalIncome.toFixed(2)}
-							</ThemedText>
-						</View>
-						<View style={styles.balanceItem}>
-							<Ionicons
-								name="arrow-down-circle-outline"
-								size={20}
-								color={theme.error}
-							/>
-							<ThemedText style={[styles.expenseLabel, { color: theme.gray }]}>
-								Despesas
-							</ThemedText>
-							<ThemedText style={[styles.expenseValue, { color: theme.error }]}>
-								R$ {totalExpense.toFixed(2)}
-							</ThemedText>
-						</View>
+							<View
+								style={[
+									styles.notificationBadge,
+									{ backgroundColor: theme.tint },
+								]}
+							>
+								<ThemedText style={styles.badgeText}>1</ThemedText>
+							</View>
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.topBarIconBtn}>
+							<Ionicons name="settings-outline" size={22} color={theme.tint} />
+						</TouchableOpacity>
 					</View>
 				</View>
-				{/* Lista de transações recentes */}
-				<View style={styles.section}>
-					<ThemedText style={[styles.sectionTitle, { color: theme.text }]}>
-						Transações Recentes
-					</ThemedText>
-					<View style={styles.transactionList}>
-						{loading ? (
-							<ThemedText>Carregando...</ThemedText>
-						) : transactions.length === 0 ? (
-							<ThemedText>Nenhuma transação encontrada.</ThemedText>
-						) : (
-							transactions.map((tx) => (
-								<View
-									key={tx.id}
-									style={[
-										styles.transactionItem,
-										{ backgroundColor: theme.card },
-									]}
-								>
-									<Ionicons
-										name={
-											tx.type === "income" ? "cash-outline" : "cart-outline"
-										}
-										size={22}
-										color={theme.tint}
-										style={styles.transactionIcon}
-									/>
-									<View style={styles.transactionInfo}>
-										<ThemedText
-											style={[styles.transactionTitle, { color: theme.text }]}
-											numberOfLines={1}
-											ellipsizeMode="tail"
-										>
-											{tx.title?.trim() ? tx.title : "Sem título"}
-										</ThemedText>
-										<ThemedText
-											style={{ color: theme.gray, fontSize: 13, marginTop: 2 }}
-											numberOfLines={1}
-											ellipsizeMode="tail"
-										>
-											{tx.type === "income"
-												? (tx.source?.trim() ? tx.source : "Sem categoria")
-												: (tx.category?.trim() ? tx.category : "Sem categoria")}
-										</ThemedText>
-										<ThemedText
-											style={[styles.transactionDate, { color: theme.gray }]}
-										>
-											{tx.date}
-										</ThemedText>
-									</View>
-									<TouchableOpacity
-										onPress={() => handleDelete(tx.id || "", tx.type)}
-									>
-										<Ionicons
-											name="trash-outline"
-											size={20}
-											color={theme.error}
-										/>
-									</TouchableOpacity>
-									<ThemedText
+				<ScrollView
+					contentContainerStyle={styles.scrollContent}
+					showsVerticalScrollIndicator={false}
+				>
+					{/* Card de Saldo */}
+					<View style={[styles.balanceCard, { backgroundColor: theme.card }]}>
+						<ThemedText style={[styles.balanceLabel, { color: theme.gray }]}>
+							Saldo em contas
+						</ThemedText>
+						<ThemedText style={[styles.balanceValue, { color: theme.text }]}>
+							R$ {balance.toFixed(2)}
+						</ThemedText>
+						<View style={styles.balanceRow}>
+							<View style={styles.balanceItem}>
+								<Ionicons
+									name="arrow-up-circle-outline"
+									size={20}
+									color={theme.tint}
+								/>
+								<ThemedText style={[styles.incomeLabel, { color: theme.gray }]}>
+									Receitas
+								</ThemedText>
+								<ThemedText style={[styles.incomeValue, { color: theme.tint }]}>
+									R$ {totalIncome.toFixed(2)}
+								</ThemedText>
+							</View>
+							<View style={styles.balanceItem}>
+								<Ionicons
+									name="arrow-down-circle-outline"
+									size={20}
+									color={theme.error}
+								/>
+								<ThemedText style={[styles.expenseLabel, { color: theme.gray }]}>
+									Despesas
+								</ThemedText>
+								<ThemedText style={[styles.expenseValue, { color: theme.error }]}>
+									R$ {totalExpense.toFixed(2)}
+								</ThemedText>
+							</View>
+						</View>
+					</View>
+					{/* Lista de transações recentes */}
+					<View style={styles.section}>
+						<ThemedText style={[styles.sectionTitle, { color: theme.text }]}>
+							Transações Recentes
+						</ThemedText>
+						<View style={styles.transactionList}>
+							{loading ? (
+								<ThemedText>Carregando...</ThemedText>
+							) : transactions.length === 0 ? (
+								<ThemedText>Nenhuma transação encontrada.</ThemedText>
+							) : (
+								transactions.map((tx) => (
+									<View
+										key={tx.id}
 										style={[
-											tx.type === "income"
-												? styles.incomeValue
-												: styles.expenseValue,
-											{
-												color: tx.type === "income" ? theme.tint : theme.error,
-											},
+											styles.transactionItem,
+											{ backgroundColor: theme.card },
 										]}
 									>
-										R$ {tx.amount}
-									</ThemedText>
-								</View>
-							))
-						)}
+										<Ionicons
+											name={
+												tx.type === "income" ? "cash-outline" : "cart-outline"
+											}
+											size={22}
+											color={theme.tint}
+											style={styles.transactionIcon}
+										/>
+										<View style={styles.transactionInfo}>
+											<ThemedText
+												style={[styles.transactionTitle, { color: theme.text }]}
+												numberOfLines={1}
+												ellipsizeMode="tail"
+											>
+												{tx.title?.trim() ? tx.title : "Sem título"}
+											</ThemedText>
+											<ThemedText
+												style={{ color: theme.gray, fontSize: 13, marginTop: 2 }}
+												numberOfLines={1}
+												ellipsizeMode="tail"
+											>
+												{tx.type === "income"
+													? (tx.source?.trim() ? tx.source : "Sem categoria")
+													: (tx.category?.trim() ? tx.category : "Sem categoria")}
+											</ThemedText>
+											<ThemedText
+												style={[styles.transactionDate, { color: theme.gray }]}
+											>
+												{tx.date}
+											</ThemedText>
+										</View>
+										<TouchableOpacity
+											onPress={() => handleDelete(tx.id || "", tx.type)}
+										>
+											<Ionicons
+												name="trash-outline"
+												size={20}
+												color={theme.error}
+											/>
+										</TouchableOpacity>
+										<ThemedText
+											style={[
+												tx.type === "income"
+													? styles.incomeValue
+													: styles.expenseValue,
+												{
+													color: tx.type === "income" ? theme.tint : theme.error,
+												},
+											]}
+										>
+											R$ {tx.amount}
+										</ThemedText>
+									</View>
+								))
+							)}
+						</View>
 					</View>
-				</View>
-			</ScrollView>
-			{/* Botão flutuante de ação */}
-			<TouchableOpacity
-				style={[styles.fab, { backgroundColor: theme.tint }]}
-				onPress={() => setFabMenuVisible(true)}
-			>
-				<Ionicons name="add" size={32} color="#fff" />
-			</TouchableOpacity>
-			{/* Menu do FAB */}
-			<Modal visible={fabMenuVisible} animationType="fade" transparent>
-				<View
-					style={{
-						flex: 1,
-						backgroundColor: "rgba(0,0,0,0.2)",
-						justifyContent: "flex-end",
-					}}
+				</ScrollView>
+				{/* Botão flutuante de ação */}
+				<TouchableOpacity
+					style={[styles.fab, { backgroundColor: theme.tint }]}
+					onPress={() => setFabMenuVisible(true)}
 				>
+					<Ionicons name="add" size={32} color="#fff" />
+				</TouchableOpacity>
+				{/* Menu do FAB */}
+				<Modal visible={fabMenuVisible} animationType="fade" transparent>
 					<View
 						style={{
-							backgroundColor: "#fff",
-							borderTopLeftRadius: 20,
-							borderTopRightRadius: 20,
-							padding: 24,
+							flex: 1,
+							backgroundColor: "rgba(0,0,0,0.2)",
+							justifyContent: "flex-end",
 						}}
 					>
-						<TouchableOpacity
+						<View
 							style={{
-								flexDirection: "row",
-								alignItems: "center",
-								marginBottom: 24,
+								backgroundColor: "#fff",
+								borderTopLeftRadius: 20,
+								borderTopRightRadius: 20,
+								padding: 24,
 							}}
-							onPress={() => openAddModal("income")}
 						>
-							<Ionicons
-								name="add-circle-outline"
-								size={28}
-								color={theme.tint}
-								style={{ marginRight: 12 }}
-							/>
-							<ThemedText style={{ fontSize: 18, color: theme.tint }}>
-								Adicionar Receita
-							</ThemedText>
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={{ flexDirection: "row", alignItems: "center" }}
-							onPress={() => openAddModal("expense")}
-						>
-							<Ionicons
-								name="remove-circle-outline"
-								size={28}
-								color={theme.error}
-								style={{ marginRight: 12 }}
-							/>
-							<ThemedText style={{ fontSize: 18, color: theme.error }}>
-								Adicionar Despesa
-							</ThemedText>
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={{ alignItems: "center", marginTop: 24 }}
-							onPress={() => setFabMenuVisible(false)}
-						>
-							<ThemedText style={{ color: theme.error }}>Cancelar</ThemedText>
-						</TouchableOpacity>
+							<TouchableOpacity
+								style={{
+									flexDirection: "row",
+									alignItems: "center",
+									marginBottom: 24,
+								}}
+								onPress={() => openAddModal("income")}
+							>
+								<Ionicons
+									name="add-circle-outline"
+									size={28}
+									color={theme.tint}
+									style={{ marginRight: 12 }}
+								/>
+								<ThemedText style={{ fontSize: 18, color: theme.tint }}>
+									Adicionar Receita
+								</ThemedText>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={{ flexDirection: "row", alignItems: "center" }}
+								onPress={() => openAddModal("expense")}
+							>
+								<Ionicons
+									name="remove-circle-outline"
+									size={28}
+									color={theme.error}
+									style={{ marginRight: 12 }}
+								/>
+								<ThemedText style={{ fontSize: 18, color: theme.error }}>
+									Adicionar Despesa
+								</ThemedText>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={{ alignItems: "center", marginTop: 24 }}
+								onPress={() => setFabMenuVisible(false)}
+							>
+								<ThemedText style={{ color: theme.error }}>Cancelar</ThemedText>
+							</TouchableOpacity>
+						</View>
 					</View>
-				</View>
-			</Modal>
-			{/* Modal de adicionar transação */}
-			<Modal visible={modalVisible} animationType="slide" transparent>
-				<View
-					style={{
-						flex: 1,
-						backgroundColor: "rgba(0,0,0,0.2)",
-						justifyContent: "center",
-						alignItems: "center",
-					}}
-				>
+				</Modal>
+				{/* Modal de adicionar transação */}
+				<Modal visible={modalVisible} animationType="slide" transparent>
 					<View
 						style={{
-							backgroundColor: "#fff",
-							borderRadius: 20,
-							padding: 28,
-							width: "96%",
-							maxHeight: "85%",
-							shadowColor: theme.tint,
-							shadowOpacity: 0.08,
-							shadowRadius: 16,
-							elevation: 8,
+							flex: 1,
+							backgroundColor: "rgba(0,0,0,0.2)",
+							justifyContent: "center",
+							alignItems: "center",
 						}}
 					>
-						<ScrollView showsVerticalScrollIndicator={false}>
-							<ThemedText
-								style={{ fontSize: 22, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: theme.text }}
-							>
-								{form.type === "income" ? "Nova Receita" : "Nova Despesa"}
-							</ThemedText>
-							<TextInput
-								style={[styles.input, styles.inputModern]}
-								placeholder="Título"
-								placeholderTextColor={theme.gray}
-								value={form.title}
-								onChangeText={(v) => setForm((f) => ({ ...f, title: v }))}
-								numberOfLines={1}
-								textAlignVertical="center"
-							/>
-							{form.type === "income" ? (
+						<View
+							style={{
+								backgroundColor: "#fff",
+								borderRadius: 20,
+								padding: 28,
+								width: "96%",
+								maxHeight: "85%",
+								shadowColor: theme.tint,
+								shadowOpacity: 0.08,
+								shadowRadius: 16,
+								elevation: 8,
+							}}
+						>
+							<ScrollView showsVerticalScrollIndicator={false}>
+								<ThemedText
+									style={{ fontSize: 22, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: theme.text }}
+								>
+									{form.type === "income" ? "Nova Receita" : "Nova Despesa"}
+								</ThemedText>
 								<TextInput
 									style={[styles.input, styles.inputModern]}
-									placeholder="Origem (ex: Salário, Investimentos)"
+									placeholder="Título"
 									placeholderTextColor={theme.gray}
-									value={form.source || ""}
-									onChangeText={(v) => setForm((f) => ({ ...f, source: v, category: v }))}
+									value={form.title}
+									onChangeText={(v) => setForm((f) => ({ ...f, title: v }))}
 									numberOfLines={1}
 									textAlignVertical="center"
 								/>
-							) : (
-								<View style={styles.pickerWrapper}>
-									<Picker
-										selectedValue={form.category}
-										onValueChange={(v: string) => setForm((f) => ({ ...f, category: v }))}
-										style={{ color: form.category ? theme.text : theme.gray }}
-									>
-										<Picker.Item label="Selecione uma categoria" value="" color={theme.gray} />
-										{CATEGORIAS_PADRAO.map((cat) => (
-											<Picker.Item
-												key={cat.value}
-												label={cat.label}
-												value={cat.value}
-											/>
-										))}
-									</Picker>
-								</View>
-							)}
-							<TextInput
-								style={[styles.input, styles.inputModern]}
-								placeholder="Valor"
-								placeholderTextColor={theme.gray}
-								value={form.amountStr ?? ""}
-								onChangeText={(v) => {
-									let valor = v.replace(/[^0-9.,]/g, "");
-									const match = valor.match(/^(\d*)([.,]?(\d{0,2})?)?/);
-									if (match) valor = match[1] + (match[2] || "");
-									setForm((f) => ({ ...f, amountStr: valor }));
-								}}
-								keyboardType="decimal-pad"
-								numberOfLines={1}
-								textAlignVertical="center"
-							/>
-							<TextInput
-								style={[styles.input, styles.inputModern]}
-								placeholder="Data (YYYY-MM-DD)"
-								placeholderTextColor={theme.gray}
-								value={form.date}
-								onChangeText={(v) => setForm((f) => ({ ...f, date: v }))}
-								numberOfLines={1}
-								textAlignVertical="center"
-							/>
-							{form.type === "expense" && (
+								{form.type === "income" ? (
+									<TextInput
+										style={[styles.input, styles.inputModern]}
+										placeholder="Origem (ex: Salário, Investimentos)"
+										placeholderTextColor={theme.gray}
+										value={form.source || ""}
+										onChangeText={(v) => setForm((f) => ({ ...f, source: v, category: v }))}
+										numberOfLines={1}
+										textAlignVertical="center"
+									/>
+								) : (
+									<View style={styles.pickerWrapper}>
+										<Picker
+											selectedValue={form.category}
+											onValueChange={(v: string) => setForm((f) => ({ ...f, category: v }))}
+											style={{ color: form.category ? theme.text : theme.gray }}
+										>
+											<Picker.Item label="Selecione uma categoria" value="" color={theme.gray} />
+											{CATEGORIAS_PADRAO.map((cat) => (
+												<Picker.Item
+													key={cat.value}
+													label={cat.label}
+													value={cat.value}
+												/>
+											))}
+										</Picker>
+									</View>
+								)}
 								<TextInput
 									style={[styles.input, styles.inputModern]}
-									placeholder="Observações (opcional)"
+									placeholder="Valor"
 									placeholderTextColor={theme.gray}
-									value={form.notes || ""}
-									onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))}
-									multiline
-									numberOfLines={3}
-									textAlignVertical="top"
+									value={form.amountStr ?? ""}
+									onChangeText={(v) => {
+										let valor = v.replace(/[^0-9.,]/g, "");
+										const match = valor.match(/^(\d*)([.,]?(\d{0,2})?)?/);
+										if (match) valor = match[1] + (match[2] || "");
+										setForm((f) => ({ ...f, amountStr: valor }));
+									}}
+									keyboardType="decimal-pad"
+									numberOfLines={1}
+									textAlignVertical="center"
 								/>
-							)}
-							<View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20, marginTop: 4 }}>
-								<TouchableOpacity
-									style={[
-										styles.checkbox,
-										form.is_recurring && { backgroundColor: theme.tint, borderColor: theme.tint },
-									]}
-									onPress={() => setForm((f) => ({ ...f, is_recurring: !f.is_recurring }))}
-									activeOpacity={0.7}
-								>
-									{form.is_recurring && (
-										<Ionicons name="checkmark" size={18} color="#fff" />
-									)}
-								</TouchableOpacity>
-								<ThemedText style={{ marginLeft: 10, color: theme.text, fontSize: 15 }}>Transação recorrente</ThemedText>
-							</View>
-							<View style={{ flexDirection: "row", marginVertical: 10, gap: 10 }}>
-								<TouchableOpacity
-									style={[
-										styles.typeButton,
-										form.type === "income" && { backgroundColor: theme.tint, shadowColor: theme.tint, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
-									]}
-									onPress={() => setForm((f) => ({ ...f, type: "income" }))}
-									activeOpacity={0.85}
-								>
-									<Ionicons name="cash-outline" size={18} color={form.type === "income" ? "#fff" : theme.text} style={{ marginRight: 6 }} />
-									<ThemedText
+								<TextInput
+									style={[styles.input, styles.inputModern]}
+									placeholder="Data (YYYY-MM-DD)"
+									placeholderTextColor={theme.gray}
+									value={form.date}
+									onChangeText={(v) => setForm((f) => ({ ...f, date: v }))}
+									numberOfLines={1}
+									textAlignVertical="center"
+								/>
+								{form.type === "expense" && (
+									<TextInput
+										style={[styles.input, styles.inputModern]}
+										placeholder="Observações (opcional)"
+										placeholderTextColor={theme.gray}
+										value={form.notes || ""}
+										onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))}
+										multiline
+										numberOfLines={3}
+										textAlignVertical="top"
+									/>
+								)}
+								<View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20, marginTop: 4 }}>
+									<TouchableOpacity
 										style={[
-											styles.typeButtonText,
-											form.type === "income" && { color: "#fff" },
+											styles.checkbox,
+											form.is_recurring && { backgroundColor: theme.tint, borderColor: theme.tint },
 										]}
+										onPress={() => setForm((f) => ({ ...f, is_recurring: !f.is_recurring }))}
+										activeOpacity={0.7}
 									>
-										Receita
-									</ThemedText>
-								</TouchableOpacity>
-								<TouchableOpacity
-									style={[
-										styles.typeButton,
-										form.type === "expense" && { backgroundColor: theme.error, shadowColor: theme.error, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
-									]}
-									onPress={() => setForm((f) => ({ ...f, type: "expense" }))}
-									activeOpacity={0.85}
-								>
-									<Ionicons name="cart-outline" size={18} color={form.type === "expense" ? "#fff" : theme.text} style={{ marginRight: 6 }} />
-									<ThemedText
+										{form.is_recurring && (
+											<Ionicons name="checkmark" size={18} color="#fff" />
+										)}
+									</TouchableOpacity>
+									<ThemedText style={{ marginLeft: 10, color: theme.text, fontSize: 15 }}>Transação recorrente</ThemedText>
+								</View>
+								<View style={{ flexDirection: "row", marginVertical: 10, gap: 10 }}>
+									<TouchableOpacity
 										style={[
-											styles.typeButtonText,
-											form.type === "expense" && { color: "#fff" },
+											styles.typeButton,
+											form.type === "income" && { backgroundColor: theme.tint, shadowColor: theme.tint, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
 										]}
+										onPress={() => setForm((f) => ({ ...f, type: "income" }))}
+										activeOpacity={0.85}
 									>
-										Despesa
+										<Ionicons name="cash-outline" size={18} color={form.type === "income" ? "#fff" : theme.text} style={{ marginRight: 6 }} />
+										<ThemedText
+											style={[
+												styles.typeButtonText,
+												form.type === "income" && { color: "#fff" },
+											]}
+										>
+											Receita
+										</ThemedText>
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={[
+											styles.typeButton,
+											form.type === "expense" && { backgroundColor: theme.error, shadowColor: theme.error, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
+										]}
+										onPress={() => setForm((f) => ({ ...f, type: "expense" }))}
+										activeOpacity={0.85}
+									>
+										<Ionicons name="cart-outline" size={18} color={form.type === "expense" ? "#fff" : theme.text} style={{ marginRight: 6 }} />
+										<ThemedText
+											style={[
+												styles.typeButtonText,
+												form.type === "expense" && { color: "#fff" },
+											]}
+										>
+											Despesa
+										</ThemedText>
+									</TouchableOpacity>
+								</View>
+								{formError && (
+									<ThemedText style={{ color: theme.error, marginBottom: 16, textAlign: "center" }}>
+										{formError}
 									</ThemedText>
-								</TouchableOpacity>
-							</View>
-							{formError && (
-								<ThemedText style={{ color: theme.error, marginBottom: 16, textAlign: "center" }}>
-									{formError}
-								</ThemedText>
-							)}
-							<View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
-								<TouchableOpacity
-									style={[styles.button, { backgroundColor: theme.gray, minWidth: 100, alignItems: "center", shadowColor: theme.gray, shadowOpacity: 0.10, shadowRadius: 6, elevation: 1 }]}
-									onPress={() => setModalVisible(false)}
-									activeOpacity={0.8}
-								>
-									<ThemedText style={{ color: "#fff", fontWeight: "bold" }}>Cancelar</ThemedText>
-								</TouchableOpacity>
-								<TouchableOpacity
-									style={[styles.button, { backgroundColor: theme.tint, minWidth: 100, alignItems: "center", shadowColor: theme.tint, shadowOpacity: 0.15, shadowRadius: 8, elevation: 2 }]}
-									onPress={handleSave}
-									disabled={saving}
-									activeOpacity={0.8}
-								>
-									{saving ? (
-										<ActivityIndicator color="#fff" />
-									) : (
-										<ThemedText style={{ color: "#fff", fontWeight: "bold" }}>Salvar</ThemedText>
-									)}
-								</TouchableOpacity>
-							</View>
-						</ScrollView>
+								)}
+								<View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
+									<TouchableOpacity
+										style={[styles.button, { backgroundColor: theme.gray, minWidth: 100, alignItems: "center", shadowColor: theme.gray, shadowOpacity: 0.10, shadowRadius: 6, elevation: 1 }]}
+										onPress={() => setModalVisible(false)}
+										activeOpacity={0.8}
+									>
+										<ThemedText style={{ color: "#fff", fontWeight: "bold" }}>Cancelar</ThemedText>
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={[styles.button, { backgroundColor: theme.tint, minWidth: 100, alignItems: "center", shadowColor: theme.tint, shadowOpacity: 0.15, shadowRadius: 8, elevation: 2 }]}
+										onPress={handleSave}
+										disabled={saving}
+										activeOpacity={0.8}
+									>
+										{saving ? (
+											<ActivityIndicator color="#fff" />
+										) : (
+											<ThemedText style={{ color: "#fff", fontWeight: "bold" }}>Salvar</ThemedText>
+										)}
+									</TouchableOpacity>
+								</View>
+							</ScrollView>
+						</View>
 					</View>
-				</View>
-			</Modal>
-		</View>
+				</Modal>
+			</View>
+		</SafeAreaView>
 	);
 }
 

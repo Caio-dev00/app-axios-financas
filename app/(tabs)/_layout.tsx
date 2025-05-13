@@ -42,6 +42,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home-outline" size={size} color={color} />
             ),
+            headerShown: false,
           }}
         />
         <Tabs.Screen
@@ -51,6 +52,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="swap-horizontal-outline" size={size} color={color} />
             ),
+            headerShown: false,
           }}
         />
         <Tabs.Screen
@@ -60,6 +62,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="bar-chart-outline" size={size} color={color} />
             ),
+            headerShown: false,
           }}
         />
         <Tabs.Screen
@@ -69,6 +72,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="person-outline" size={size} color={color} />
             ),
+            headerShown: false,
           }}
         />
       </Tabs>
