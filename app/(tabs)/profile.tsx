@@ -5,9 +5,9 @@ import axios from 'axios';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Image, Linking, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getUser } from '../supabaseClient';
+import { getProfile, getUser, updateProfile } from '../supabaseClient';
 
 interface UserProfile {
   id: string;
@@ -15,6 +15,8 @@ interface UserProfile {
   full_name: string;
   avatar_url: string;
   is_pro: boolean;
+  telefone?: string;
+  phone?: string;
 }
 
 export default function ProfileScreen() {
@@ -26,29 +28,17 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [isPro, setIsPro] = useState(false);
   const [fullName, setFullName] = useState<string>('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    nome: '',
+    phone: '',
+    email: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUserProfile();
-    async function fetchFullName() {
-      try {
-        const user = await getUser();
-        if (user?.id) {
-          const supabaseUrl = 'https://yascliotrmqhvqbvrhsc.supabase.co';
-          const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc2NsaW90cm1xaHZxYnZyaHNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5NTA3NjksImV4cCI6MjA2MTUyNjc2OX0.Yh2Ebi1n6CPx2mVERHfA7G5w_kaF6_p7OImAF3qRj8o';
-          const token = await SecureStore.getItemAsync('supabase_token');
-          const { data } = await axios.get(`${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}`, {
-            headers: {
-              apikey: supabaseAnonKey,
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          if (Array.isArray(data) && data[0]?.nome) {
-            setFullName(data[0].nome);
-          }
-        }
-      } catch {}
-    }
-    fetchFullName();
   }, []);
 
   const fetchUserProfile = async () => {
@@ -59,12 +49,24 @@ export default function ProfileScreen() {
         return;
       }
 
+      const profile = await getProfile();
+      if (profile) {
+        setFullName(profile.nome || '');
+        setEditForm({
+          nome: profile.nome || '',
+          phone: profile.phone || '',
+          email: authUser.email || '',
+        });
+      }
+
       setUser({
         id: authUser.id,
         email: authUser.email || '',
         full_name: authUser.user_metadata?.full_name || '',
         avatar_url: authUser.user_metadata?.avatar_url || '',
-        is_pro: false
+        is_pro: false,
+        telefone: profile?.telefone,
+        phone: profile?.phone,
       });
 
       const token = await SecureStore.getItemAsync('supabase_token');
@@ -93,11 +95,45 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleEditProfile = async () => {
+    setFormError(null);
+    console.log('=== [DEBUG] handleEditProfile ===');
+    console.log('Payload a ser enviado:', { nome: editForm.nome, phone: editForm.phone });
+    if (!editForm.nome.trim()) {
+      setFormError('Nome é obrigatório');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Logar valor atual do banco antes do update
+      const before = await getProfile();
+      console.log('Valor atual no banco:', before);
+
+      await updateProfile({
+        nome: editForm.nome,
+        phone: editForm.phone,
+      });
+
+      // Logar valor do banco após o update
+      const after = await getProfile();
+      console.log('Valor após update:', after);
+
+      setFullName(editForm.nome);
+      setShowEditModal(false);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setFormError('Erro ao atualizar perfil. Tente novamente.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom', 'left', 'right']}>
-        <View style={{ flex: 1 }}>
-          <ThemedText>Carregando...</ThemedText>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={theme.tint} />
         </View>
       </SafeAreaView>
     );
@@ -126,12 +162,18 @@ export default function ProfileScreen() {
               )}
             </View>
             <ThemedText style={[styles.name, { color: theme.text }]}>{fullName || 'Usuário'}</ThemedText>
-            <ThemedText style={[styles.email, { color: theme.gray }]}>{user?.email}</ThemedText>
+            <ThemedText style={[styles.email, { color: theme.gray }]}>{editForm.email}</ThemedText>
+            {editForm.phone && (
+              <ThemedText style={[styles.phone, { color: theme.gray }]}>{editForm.phone}</ThemedText>
+            )}
           </View>
 
           {/* Menu Items */}
           <View style={styles.menuSection}>
-            <TouchableOpacity style={[styles.menuItem, { backgroundColor: theme.card }]}>
+            <TouchableOpacity 
+              style={[styles.menuItem, { backgroundColor: theme.card }]}
+              onPress={() => setShowEditModal(true)}
+            >
               <Ionicons name="person-outline" size={24} color={theme.tint} />
               <ThemedText style={[styles.menuText, { color: theme.text }]}>Editar Perfil</ThemedText>
               <Ionicons name="chevron-forward" size={24} color={theme.gray} />
@@ -158,7 +200,10 @@ export default function ProfileScreen() {
               <ThemedText style={styles.proDescription}>
                 Assine o plano PRO e tenha acesso a recursos avançados de gestão financeira
               </ThemedText>
-              <TouchableOpacity style={styles.proButton}>
+              <TouchableOpacity 
+                style={styles.proButton}
+                onPress={() => Linking.openURL('https://pay.cakto.com.br/3bnjhuj_366904')}
+              >
                 <ThemedText style={styles.proButtonText}>Assinar Agora</ThemedText>
               </TouchableOpacity>
             </View>
@@ -172,6 +217,73 @@ export default function ProfileScreen() {
             <ThemedText style={styles.logoutText}>Sair</ThemedText>
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Modal de Edição de Perfil */}
+        <Modal
+          visible={showEditModal}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setShowEditModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+              <ThemedText style={[styles.modalTitle, { color: theme.text }]}>Editar Perfil</ThemedText>
+              
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.background, color: theme.text }]}
+                placeholder="Nome completo"
+                placeholderTextColor={theme.gray}
+                value={editForm.nome}
+                onChangeText={(text) => setEditForm(prev => ({ ...prev, nome: text }))}
+                maxLength={25}
+              />
+
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.background, color: theme.text }]}
+                placeholder="Telefone (opcional)"
+                placeholderTextColor={theme.gray}
+                value={editForm.phone}
+                onChangeText={(text) => setEditForm(prev => ({ ...prev, phone: text }))}
+                keyboardType="phone-pad"
+              />
+
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.background, color: theme.text }]}
+                placeholder="E-mail"
+                placeholderTextColor={theme.gray}
+                value={editForm.email}
+                editable={false}
+              />
+
+              {formError && (
+                <ThemedText style={[styles.errorText, { color: theme.error }]}>
+                  {formError}
+                </ThemedText>
+              )}
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: theme.gray }]}
+                  onPress={() => setShowEditModal(false)}
+                >
+                  <ThemedText style={styles.modalButtonText}>Cancelar</ThemedText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: theme.tint }]}
+                  onPress={handleEditProfile}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <ThemedText style={styles.modalButtonText}>Salvar</ThemedText>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -202,6 +314,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   email: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  phone: {
     fontSize: 16,
   },
   menuSection: {
@@ -256,5 +372,52 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    fontSize: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  errorText: {
+    textAlign: 'center',
+    marginBottom: 16,
   },
 }); 

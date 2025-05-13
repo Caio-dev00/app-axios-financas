@@ -316,3 +316,51 @@ axios.interceptors.response.use(
 		return Promise.reject(error);
 	},
 );
+
+export async function updateProfile({ nome, phone, avatar_url }: { nome?: string; phone?: string; avatar_url?: string }) {
+	const user = await getUser();
+	if (!user?.id) throw new Error('Usuário não autenticado');
+
+	const supabaseUrl = 'https://yascliotrmqhvqbvrhsc.supabase.co';
+	const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc2NsaW90cm1xaHZxYnZyaHNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5NTA3NjksImV4cCI6MjA2MTUyNjc2OX0.Yh2Ebi1n6CPx2mVERHfA7G5w_kaF6_p7OImAF3qRj8o';
+	const token = await SecureStore.getItemAsync('supabase_token');
+
+	try {
+		await axios.patch(
+			`${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}`,
+			{ nome, phone, avatar_url },
+			{
+				headers: {
+					apikey: supabaseAnonKey,
+					Authorization: `Bearer ${token}`,
+					'Content-Type': 'application/json',
+					Prefer: 'return=minimal',
+				},
+			}
+		);
+	} catch (error) {
+		console.error('Error updating profile:', error);
+		throw new Error('Erro ao atualizar perfil. Tente novamente.');
+	}
+}
+
+export async function getProfile() {
+	const user = await getUser();
+	if (!user?.id) throw new Error('Usuário não autenticado');
+
+	const supabaseUrl = 'https://yascliotrmqhvqbvrhsc.supabase.co';
+	const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc2NsaW90cm1xaHZxYnZyaHNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5NTA3NjksImV4cCI6MjA2MTUyNjc2OX0.Yh2Ebi1n6CPx2mVERHfA7G5w_kaF6_p7OImAF3qRj8o';
+	const token = await SecureStore.getItemAsync('supabase_token');
+
+	const { data } = await axios.get(`${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}`, {
+		headers: {
+			apikey: supabaseAnonKey,
+			Authorization: `Bearer ${token}`,
+		},
+	});
+
+	if (Array.isArray(data) && data.length > 0) {
+		return data[0];
+	}
+	return null;
+}

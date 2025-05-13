@@ -9,6 +9,7 @@ import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
 import {
 	ActivityIndicator,
+	Linking,
 	Modal,
 	ScrollView,
 	StatusBar,
@@ -68,6 +69,9 @@ export default function DashboardScreen() {
 	const [formError, setFormError] = useState<string | null>(null);
 	const [showDatePicker, setShowDatePicker] = useState(false);
 	const [userName, setUserName] = useState<string>('');
+	const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+	const [isPro, setIsPro] = useState(false);
+	const [daysLeft, setDaysLeft] = useState<number | null>(null);
 
 	useEffect(() => {
 		async function fetchUserName() {
@@ -91,6 +95,42 @@ export default function DashboardScreen() {
 			} catch {}
 		}
 		fetchUserName();
+	}, []);
+
+	// Buscar status da assinatura
+	useEffect(() => {
+		async function fetchSubscription() {
+			try {
+				const user = await getUser();
+				if (user?.id) {
+					const supabaseUrl = 'https://yascliotrmqhvqbvrhsc.supabase.co';
+					const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc2NsaW90cm1xaHZxYnZyaHNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5NTA3NjksImV4cCI6MjA2MTUyNjc2OX0.Yh2Ebi1n6CPx2mVERHfA7G5w_kaF6_p7OImAF3qRj8o';
+					const token = await SecureStore.getItemAsync('supabase_token');
+					const { data } = await axios.get(`${supabaseUrl}/rest/v1/user_subscriptions?user_id=eq.${user.id}&is_active=eq.true`, {
+						headers: {
+							apikey: supabaseAnonKey,
+							Authorization: `Bearer ${token}`,
+						},
+					});
+					if (Array.isArray(data) && data.length > 0 && data[0].plan_type === 'pro') {
+						setIsPro(true);
+						if (data[0].expires_at) {
+							const expires = new Date(data[0].expires_at);
+							const now = new Date();
+							const diff = Math.ceil((expires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+							setDaysLeft(diff > 0 ? diff : 0);
+						}
+					} else {
+						setIsPro(false);
+						setDaysLeft(null);
+					}
+				}
+			} catch {
+				setIsPro(false);
+				setDaysLeft(null);
+			}
+		}
+		fetchSubscription();
 	}, []);
 
 	const openAddModal = (type: "income" | "expense") => {
@@ -165,7 +205,7 @@ export default function DashboardScreen() {
 
 	return (
 		<SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom', 'left', 'right']}>
-			<StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.background} />
+			<StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.tint} />
 			<View style={[styles.container, { backgroundColor: theme.background }]}>
 				{/* Top Bar */}
 				<View style={styles.topBar}>
@@ -186,7 +226,7 @@ export default function DashboardScreen() {
 								<ThemedText style={styles.badgeText}>1</ThemedText>
 							</View>
 						</TouchableOpacity>
-						<TouchableOpacity style={styles.topBarIconBtn}>
+						<TouchableOpacity style={styles.topBarIconBtn} onPress={() => setShowSubscriptionModal(true)}>
 							<Ionicons name="settings-outline" size={22} color={theme.tint} />
 						</TouchableOpacity>
 					</View>
@@ -551,6 +591,40 @@ export default function DashboardScreen() {
 									</TouchableOpacity>
 								</View>
 							</ScrollView>
+						</View>
+					</View>
+				</Modal>
+				<Modal visible={showSubscriptionModal} animationType="slide" transparent>
+					<View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', alignItems: 'center' }}>
+						<View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 28, width: '92%', maxWidth: 400, alignItems: 'center', shadowColor: theme.tint, shadowOpacity: 0.10, shadowRadius: 16, elevation: 8 }}>
+							<ThemedText style={{ fontSize: 22, fontWeight: 'bold', color: theme.text, marginBottom: 12 }}>Gerenciar Assinatura</ThemedText>
+							<Ionicons name={isPro ? 'star' : 'star-outline'} size={38} color={isPro ? theme.tint : '#888'} style={{ marginBottom: 10 }} />
+							<ThemedText style={{ fontSize: 17, color: theme.text, marginBottom: 8 }}>
+								Plano atual: <ThemedText style={{ fontWeight: 'bold', color: isPro ? theme.tint : '#888' }}>{isPro ? 'PRO' : 'Free'}</ThemedText>
+							</ThemedText>
+							{isPro && (
+								<ThemedText style={{ color: theme.text, marginBottom: 8 }}>Dias restantes: <ThemedText style={{ fontWeight: 'bold', color: theme.tint }}>{daysLeft ?? '--'}</ThemedText></ThemedText>
+							)}
+							{!isPro && (
+								<>
+									<ThemedText style={{ color: theme.text, marginBottom: 16, textAlign: 'center' }}>Desbloqueie recursos avançados e tenha uma experiência completa:</ThemedText>
+									<View style={{ alignItems: 'flex-start', marginBottom: 16 }}>
+										<ThemedText style={{ color: theme.tint, fontWeight: 'bold', marginBottom: 4 }}>• Exportação de relatórios</ThemedText>
+										<ThemedText style={{ color: theme.tint, fontWeight: 'bold', marginBottom: 4 }}>• Categorias ilimitadas</ThemedText>
+										<ThemedText style={{ color: theme.tint, fontWeight: 'bold', marginBottom: 4 }}>• Suporte prioritário</ThemedText>
+										<ThemedText style={{ color: theme.tint, fontWeight: 'bold', marginBottom: 4 }}>• E muito mais!</ThemedText>
+									</View>
+									<TouchableOpacity style={{ backgroundColor: theme.tint, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 32, marginBottom: 10 }} onPress={() => Linking.openURL('https://pay.cakto.com.br/3bnjhuj_366904')}>
+										<ThemedText style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Assinar PRO</ThemedText>
+									</TouchableOpacity>
+								</>
+							)}
+							{isPro && (
+								<ThemedText style={{ color: theme.tint, fontWeight: 'bold', marginTop: 10 }}>Obrigado por ser PRO!</ThemedText>
+							)}
+							<TouchableOpacity style={{ marginTop: 18 }} onPress={() => setShowSubscriptionModal(false)}>
+								<ThemedText style={{ color: theme.error, fontWeight: 'bold', fontSize: 15 }}>Fechar</ThemedText>
+							</TouchableOpacity>
 						</View>
 					</View>
 				</Modal>
