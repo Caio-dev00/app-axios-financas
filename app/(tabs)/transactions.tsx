@@ -120,12 +120,9 @@ export default function TransactionsScreen() {
 			amount: tx.amount,
 			amountStr: String(tx.amount).replace(".", ","),
 			type: tx.type,
-			category: tx.category,
+			category: tx.type === "income" ? tx.source || "" : tx.category,
 			date: tx.date,
-			source:
-				"source" in tx
-					? ((tx as Record<string, unknown>).source as string) || ""
-					: "",
+			source: tx.type === "income" ? tx.source || "" : "",
 			notes: tx.notes || "",
 			is_recurring: tx.is_recurring || false,
 		});
@@ -161,14 +158,34 @@ export default function TransactionsScreen() {
 				notes: form.notes || undefined,
 				is_recurring: form.is_recurring || false,
 			};
+
+			console.log('=== DADOS DO FORMULÁRIO ===');
+			console.log('Tipo:', form.type);
+			console.log('Título:', form.title);
+			console.log('Valor:', valorFloat);
+			console.log('Categoria:', form.category);
+			console.log('Source:', form.source);
+			console.log('Data:', form.date);
+			console.log('Notas:', form.notes);
+			console.log('Recorrente:', form.is_recurring);
+			console.log('Payload completo:', payload);
+
 			if (editing?.id) {
-				await updateTransacao(editing.id, payload);
+				console.log('=== EDITANDO TRANSAÇÃO ===');
+				console.log('ID:', editing.id);
+				console.log('Tipo original:', editing.type);
+				const result = await updateTransacao(editing.id, payload);
+				console.log('Resultado da atualização:', result);
 			} else {
-				await addTransacao(payload);
+				console.log('=== NOVA TRANSAÇÃO ===');
+				const result = await addTransacao(payload);
+				console.log('Resultado da criação:', result);
 			}
 			setModalVisible(false);
 			fetchData();
 		} catch (e) {
+			console.error('=== ERRO AO SALVAR ===');
+			console.error('Erro completo:', e);
 			setFormError("Não foi possível salvar a transação.");
 		}
 		setSaving(false);

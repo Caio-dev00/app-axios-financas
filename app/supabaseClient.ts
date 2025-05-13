@@ -173,6 +173,14 @@ export const updateTransacao = async (
 	const userId = await getUserId();
 	if (!userId) throw new Error("Usuário não autenticado");
 
+	console.log('=== UPDATE TRANSAÇÃO - DADOS RECEBIDOS ===');
+	console.log('ID:', id);
+	console.log('Tipo:', transacao.type);
+	console.log('Título:', transacao.title);
+	console.log('Categoria:', transacao.category);
+	console.log('Source:', transacao.source);
+	console.log('Dados completos:', transacao);
+
 	// Validação básica
 	if (transacao.title && !transacao.title.trim()) throw new Error("Título é obrigatório");
 	if (transacao.amountStr && (Number.isNaN(Number(transacao.amountStr.replace(",", "."))) || Number(transacao.amountStr.replace(",", ".")) <= 0)) 
@@ -184,6 +192,7 @@ export const updateTransacao = async (
 		throw new Error("Categoria é obrigatória");
 
 	const table = transacao.type === "expense" ? "expenses" : "incomes";
+	console.log('Tabela selecionada:', table);
 	
 	// Monta o objeto a ser enviado
 	const payload: Record<string, unknown> = {
@@ -201,30 +210,40 @@ export const updateTransacao = async (
 		if (transacao.notes) payload.notes = transacao.notes;
 	}
 
-	if (transacao.type === "income" && transacao.source) {
+	if (transacao.type === "income") {
 		payload.source = transacao.source;
-		// Para receitas, garantir que category seja igual a source
-		payload.category = transacao.source;
 	}
 
-	const { data } = await axios.patch(
-		`${supabaseUrl}/rest/v1/${table}?id=eq.${id}&user_id=eq.${userId}`,
-		payload,
-		{
-			headers: {
-				apikey: supabaseAnonKey,
-				Authorization: `Bearer ${token}`,
-				"Content-Type": "application/json",
-				Prefer: "return=representation",
-			},
-		}
-	);
+	console.log('=== PAYLOAD FINAL ===');
+	console.log('Payload completo:', payload);
 
-	return { 
-		...data[0], 
-		type: transacao.type,
-		title: data[0].description,
-	};
+	try {
+		const { data } = await axios.patch(
+			`${supabaseUrl}/rest/v1/${table}?id=eq.${id}&user_id=eq.${userId}`,
+			payload,
+			{
+				headers: {
+					apikey: supabaseAnonKey,
+					Authorization: `Bearer ${token}`,
+					"Content-Type": "application/json",
+					Prefer: "return=representation",
+				},
+			}
+		);
+
+		console.log('=== RESPOSTA DA API ===');
+		console.log('Dados retornados:', data);
+
+		return { 
+			...data[0], 
+			type: transacao.type,
+			title: data[0].description,
+		};
+	} catch (error) {
+		console.error('=== ERRO NA API ===');
+		console.error('Erro completo:', error);
+		throw error;
+	}
 };
 
 export const deleteTransacao = async (
