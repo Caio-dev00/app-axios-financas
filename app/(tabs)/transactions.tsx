@@ -3,7 +3,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
@@ -16,13 +16,8 @@ import {
 	View,
 	useColorScheme,
 } from "react-native";
-import {
-	type Transaction,
-	addTransacao,
-	deleteTransacao,
-	getTransacoes,
-	updateTransacao,
-} from "../supabaseClient";
+import { useTransactions } from "../TransactionsContext";
+import type { Transaction } from "../supabaseClient";
 
 const CATEGORIAS_DESPESA = [
 	{ label: "Alimentação", value: "Alimentação" },
@@ -43,13 +38,13 @@ export default function TransactionsScreen() {
 	const colorScheme = useColorScheme();
 	const isDark = colorScheme === "dark";
 	const theme = Colors[isDark ? "dark" : "light"];
-	const [transactions, setTransactions] = useState<Transaction[]>([]);
-	const [loading, setLoading] = useState(true);
+
+	const { transactions, loading, edit, remove } = useTransactions();
 	const [modalVisible, setModalVisible] = useState(false);
 	const [editing, setEditing] = useState<Transaction | null>(null);
 	const [form, setForm] = useState<
-		Omit<Transaction, "id"> & { 
-			source?: string; 
+		Omit<Transaction, "id"> & {
+			source?: string;
 			amountStr?: string;
 			notes?: string;
 			is_recurring?: boolean;
@@ -67,22 +62,6 @@ export default function TransactionsScreen() {
 	});
 	const [saving, setSaving] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
-
-	useEffect(() => {
-		fetchData();
-	}, []);
-
-	async function fetchData() {
-		setLoading(true);
-		try {
-			const data = await getTransacoes();
-			setTransactions(data);
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		} catch (e) {
-			setTransactions([]);
-		}
-		setLoading(false);
-	}
 
 	const filteredTransactions = transactions.filter((transaction) => {
 		if (selectedFilter === "all") return true;
@@ -122,12 +101,15 @@ export default function TransactionsScreen() {
 	};
 
 	const validateForm = () => {
-		if (!form.title.trim()) return 'Título obrigatório';
-		const valor = Number(form.amountStr?.replace(',', '.') || '');
-		if (!form.amountStr || Number.isNaN(valor) || valor <= 0) return 'Valor inválido';
-		if (!form.date.trim()) return 'Data obrigatória';
-		if (form.type === 'income' && !form.source?.trim()) return 'Origem obrigatória';
-		if (form.type === 'expense' && !form.category?.trim()) return 'Categoria obrigatória';
+		if (!form.title.trim()) return "Título obrigatório";
+		const valor = Number(form.amountStr?.replace(",", ".") || "");
+		if (!form.amountStr || Number.isNaN(valor) || valor <= 0)
+			return "Valor inválido";
+		if (!form.date.trim()) return "Data obrigatória";
+		if (form.type === "income" && !form.source?.trim())
+			return "Origem obrigatória";
+		if (form.type === "expense" && !form.category?.trim())
+			return "Categoria obrigatória";
 		return null;
 	};
 
@@ -144,40 +126,19 @@ export default function TransactionsScreen() {
 			const valorFloat = form.amountStr
 				? Number.parseFloat(form.amountStr.replace(",", "."))
 				: 0;
-			const payload = { 
-				...form, 
+			const payload = {
+				...form,
 				amount: valorFloat,
 				notes: form.notes || undefined,
 				is_recurring: form.is_recurring || false,
 			};
-
-			console.log('=== DADOS DO FORMULÁRIO ===');
-			console.log('Tipo:', form.type);
-			console.log('Título:', form.title);
-			console.log('Valor:', valorFloat);
-			console.log('Categoria:', form.category);
-			console.log('Source:', form.source);
-			console.log('Data:', form.date);
-			console.log('Notas:', form.notes);
-			console.log('Recorrente:', form.is_recurring);
-			console.log('Payload completo:', payload);
-
 			if (editing?.id) {
-				console.log('=== EDITANDO TRANSAÇÃO ===');
-				console.log('ID:', editing.id);
-				console.log('Tipo original:', editing.type);
-				const result = await updateTransacao(editing.id, payload);
-				console.log('Resultado da atualização:', result);
+				await edit(editing.id, payload);
 			} else {
-				console.log('=== NOVA TRANSAÇÃO ===');
-				const result = await addTransacao(payload);
-				console.log('Resultado da criação:', result);
+				await edit("", payload); // addTransacao também pode ser chamado via edit('')
 			}
 			setModalVisible(false);
-			fetchData();
 		} catch (e) {
-			console.error('=== ERRO AO SALVAR ===');
-			console.error('Erro completo:', e);
 			setFormError("Não foi possível salvar a transação.");
 		}
 		setSaving(false);
@@ -191,9 +152,7 @@ export default function TransactionsScreen() {
 				style: "destructive",
 				onPress: async () => {
 					try {
-						await deleteTransacao(id, type);
-						fetchData();
-					// eslint-disable-next-line @typescript-eslint/no-unused-vars
+						await remove(id, type);
 					} catch (e) {
 						Alert.alert("Erro", "Não foi possível excluir.");
 					}
@@ -229,8 +188,12 @@ export default function TransactionsScreen() {
 					ellipsizeMode="tail"
 				>
 					{item.type === "income"
-						? (item.source?.trim() ? item.source : "Sem categoria")
-						: (item.category?.trim() ? item.category : "Sem categoria")}
+						? item.source?.trim()
+							? item.source
+							: "Sem categoria"
+						: item.category?.trim()
+							? item.category
+							: "Sem categoria"}
 				</ThemedText>
 				<ThemedText style={styles.transactionDate}>{item.date}</ThemedText>
 			</View>
@@ -244,7 +207,10 @@ export default function TransactionsScreen() {
 					{item.type === "income" ? "+" : "-"}R$ {item.amount.toFixed(2)}
 				</ThemedText>
 			</View>
-			<TouchableOpacity onPress={() => openEditModal(item)} style={{ marginLeft: 8 }}>
+			<TouchableOpacity
+				onPress={() => openEditModal(item)}
+				style={{ marginLeft: 8 }}
+			>
 				<Ionicons name="pencil-outline" size={20} color="#888" />
 			</TouchableOpacity>
 		</TouchableOpacity>
@@ -419,7 +385,13 @@ export default function TransactionsScreen() {
 								/>
 							)}
 
-							<View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+							<View
+								style={{
+									flexDirection: "row",
+									alignItems: "center",
+									marginBottom: 16,
+								}}
+							>
 								<TouchableOpacity
 									style={[
 										styles.checkbox,
@@ -433,7 +405,9 @@ export default function TransactionsScreen() {
 										<Ionicons name="checkmark" size={16} color="#fff" />
 									)}
 								</TouchableOpacity>
-								<ThemedText style={{ marginLeft: 8 }}>Transação recorrente</ThemedText>
+								<ThemedText style={{ marginLeft: 8 }}>
+									Transação recorrente
+								</ThemedText>
 							</View>
 
 							<View style={{ flexDirection: "row", marginVertical: 8 }}>
@@ -477,7 +451,13 @@ export default function TransactionsScreen() {
 								</ThemedText>
 							)}
 
-							<View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
+							<View
+								style={{
+									flexDirection: "row",
+									justifyContent: "flex-end",
+									gap: 8,
+								}}
+							>
 								<TouchableOpacity
 									style={[styles.button, { backgroundColor: "#ccc" }]}
 									onPress={() => setModalVisible(false)}

@@ -2,7 +2,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
 	ActivityIndicator,
 	Modal,
@@ -13,12 +13,7 @@ import {
 	View,
 	useColorScheme,
 } from "react-native";
-import {
-	type Transaction,
-	addTransacao,
-	deleteTransacao,
-	getTransacoes,
-} from "../supabaseClient";
+import { useTransactions } from '../TransactionsContext';
 
 const CATEGORIAS_PADRAO = [
 	{ label: "Alimentação", value: "Alimentação" },
@@ -37,8 +32,7 @@ export default function DashboardScreen() {
 	const isDark = colorScheme === "dark";
 	const theme = Colors[isDark ? "dark" : "light"];
 
-	const [transactions, setTransactions] = useState<Transaction[]>([]);
-	const [loading, setLoading] = useState(true);
+	const { transactions, loading, add, remove } = useTransactions();
 	const [fabMenuVisible, setFabMenuVisible] = useState(false);
 	const [modalVisible, setModalVisible] = useState(false);
 	const [form, setForm] = useState<{
@@ -65,23 +59,6 @@ export default function DashboardScreen() {
 	);
 	const [saving, setSaving] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
-
-	const fetchTransactions = async () => {
-		setLoading(true);
-		try {
-			const data = await getTransacoes();
-			setTransactions(data as Transaction[]);
-		} catch (error) {
-			setTransactions([]);
-			console.log(error);
-		}
-		setLoading(false);
-	};
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-	useEffect(() => {
-		fetchTransactions();
-	}, []);
 
 	const openAddModal = (type: "income" | "expense") => {
 		setForm({
@@ -131,9 +108,8 @@ export default function DashboardScreen() {
 				is_recurring: form.is_recurring,
 				notes: form.notes,
 			};
-			await addTransacao(payload);
+			await add(payload);
 			setModalVisible(false);
-			fetchTransactions();
 		} catch (e: unknown) {
 			if (e && typeof e === "object" && "message" in e) {
 				setFormError((e as { message?: string }).message || "Erro ao salvar transação.");
@@ -146,8 +122,7 @@ export default function DashboardScreen() {
 
 	const handleDelete = async (id: string, type: "income" | "expense") => {
 		try {
-			await deleteTransacao(id, type);
-			fetchTransactions();
+			await remove(id, type);
 		} catch (e) {
 			alert("Erro ao excluir transação.");
 		}
