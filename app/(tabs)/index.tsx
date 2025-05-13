@@ -4,19 +4,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useEffect, useState } from "react";
 import {
-	Modal,
-	ScrollView,
-	StyleSheet,
-	TextInput,
-	TouchableOpacity,
-	View,
-	useColorScheme,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View,
+    useColorScheme,
 } from "react-native";
 import {
-	type Transaction,
-	addTransacao,
-	deleteTransacao,
-	getTransacoes,
+    type Transaction,
+    addTransacao,
+    deleteTransacao,
+    getTransacoes,
 } from "../supabaseClient";
 
 const CATEGORIAS_PADRAO = [
@@ -235,7 +235,9 @@ export default function DashboardScreen() {
 											numberOfLines={1}
 											ellipsizeMode="tail"
 										>
-											{tx.category?.trim() ? tx.category : "Sem categoria"}
+											{tx.type === "income"
+												? (tx.source?.trim() ? tx.source : "Sem categoria")
+												: (tx.category?.trim() ? tx.category : "Sem categoria")}
 										</ThemedText>
 										<ThemedText
 											style={[styles.transactionDate, { color: theme.gray }]}

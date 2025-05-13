@@ -36,15 +36,6 @@ const CATEGORIAS_DESPESA = [
 	{ label: "Outros", value: "Outros" },
 ];
 
-const CATEGORIAS_RECEITA = [
-	{ label: "Salário", value: "Salário" },
-	{ label: "Freelance", value: "Freelance" },
-	{ label: "Investimentos", value: "Investimentos" },
-	{ label: "Prêmios", value: "Prêmios" },
-	{ label: "Presentes", value: "Presentes" },
-	{ label: "Outros", value: "Outros" },
-];
-
 export default function TransactionsScreen() {
 	const [selectedFilter, setSelectedFilter] = useState<
 		"all" | "income" | "expense"
@@ -86,6 +77,7 @@ export default function TransactionsScreen() {
 		try {
 			const data = await getTransacoes();
 			setTransactions(data);
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		} catch (e) {
 			setTransactions([]);
 		}
@@ -201,6 +193,7 @@ export default function TransactionsScreen() {
 					try {
 						await deleteTransacao(id, type);
 						fetchData();
+					// eslint-disable-next-line @typescript-eslint/no-unused-vars
 					} catch (e) {
 						Alert.alert("Erro", "Não foi possível excluir.");
 					}
@@ -235,7 +228,9 @@ export default function TransactionsScreen() {
 					numberOfLines={1}
 					ellipsizeMode="tail"
 				>
-					{item.category?.trim() ? item.category : "Sem categoria"}
+					{item.type === "income"
+						? (item.source?.trim() ? item.source : "Sem categoria")
+						: (item.category?.trim() ? item.category : "Sem categoria")}
 				</ThemedText>
 				<ThemedText style={styles.transactionDate}>{item.date}</ThemedText>
 			</View>
