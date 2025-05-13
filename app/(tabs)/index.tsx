@@ -4,19 +4,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useEffect, useState } from "react";
 import {
-    Modal,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
-    useColorScheme,
+	ActivityIndicator,
+	Modal,
+	ScrollView,
+	StyleSheet,
+	TextInput,
+	TouchableOpacity,
+	View,
+	useColorScheme,
 } from "react-native";
 import {
-    type Transaction,
-    addTransacao,
-    deleteTransacao,
-    getTransacoes,
+	type Transaction,
+	addTransacao,
+	deleteTransacao,
+	getTransacoes,
 } from "../supabaseClient";
 
 const CATEGORIAS_PADRAO = [
@@ -46,14 +47,24 @@ export default function DashboardScreen() {
 		type: "income" | "expense";
 		category: string;
 		date: string;
-	}>({
-		title: "",
-		amount: 0,
-		type: "expense",
-		category: "",
-		date: new Date().toISOString().slice(0, 10),
-	});
+		source?: string;
+		amountStr?: string;
+		is_recurring: boolean;
+		notes?: string;
+	}>(
+		{
+			title: "",
+			amount: 0,
+			amountStr: "",
+			type: "expense",
+			category: "",
+			date: new Date().toISOString().slice(0, 10),
+			source: "",
+			is_recurring: false,
+		}
+	);
 	const [saving, setSaving] = useState(false);
+	const [formError, setFormError] = useState<string | null>(null);
 
 	const fetchTransactions = async () => {
 		setLoading(true);
@@ -79,30 +90,55 @@ export default function DashboardScreen() {
 			type,
 			category: "",
 			date: new Date().toISOString().slice(0, 10),
+			source: "",
+			amountStr: "",
+			is_recurring: false,
 		});
 		setModalVisible(true);
 		setFabMenuVisible(false);
 	};
 
+	const validateForm = () => {
+		if (!form.title.trim()) return 'Título obrigatório';
+		const valor = Number(form.amountStr?.replace(',', '.') || '');
+		if (!form.amountStr || Number.isNaN(valor) || valor <= 0) return 'Valor inválido';
+		if (!form.date.trim()) return 'Data obrigatória';
+		if (form.type === 'income' && !form.source?.trim()) return 'Origem obrigatória';
+		if (form.type === 'expense' && !form.category?.trim()) return 'Categoria obrigatória';
+		return null;
+	};
+
 	const handleSave = async () => {
+		setFormError(null);
+		const error = validateForm();
+		if (error) {
+			setFormError(error);
+			setSaving(false);
+			return;
+		}
 		setSaving(true);
 		try {
-			await addTransacao({
+			const valorFloat = form.amountStr
+				? Number.parseFloat(form.amountStr.replace(",", "."))
+				: 0;
+			const payload = {
 				title: form.title,
+				amount: valorFloat,
 				type: form.type,
-				category: form.category,
 				date: form.date,
-				amount: form.amount,
-			});
+				category: form.type === "expense" ? form.category : "",
+				source: form.type === "income" ? form.source : undefined,
+				is_recurring: form.is_recurring,
+				notes: form.notes,
+			};
+			await addTransacao(payload);
 			setModalVisible(false);
 			fetchTransactions();
 		} catch (e: unknown) {
 			if (e && typeof e === "object" && "message" in e) {
-				alert(
-					(e as { message?: string }).message || "Erro ao salvar transação.",
-				);
+				setFormError((e as { message?: string }).message || "Erro ao salvar transação.");
 			} else {
-				alert("Erro ao salvar transação.");
+				setFormError("Erro ao salvar transação.");
 			}
 		}
 		setSaving(false);
@@ -350,85 +386,175 @@ export default function DashboardScreen() {
 					<View
 						style={{
 							backgroundColor: "#fff",
-							borderRadius: 16,
-							padding: 24,
-							width: "90%",
+							borderRadius: 20,
+							padding: 28,
+							width: "96%",
+							maxHeight: "85%",
+							shadowColor: theme.tint,
+							shadowOpacity: 0.08,
+							shadowRadius: 16,
+							elevation: 8,
 						}}
 					>
-						<ThemedText
-							style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}
-						>
-							{form.type === "income" ? "Nova Receita" : "Nova Despesa"}
-						</ThemedText>
-						<TextInput
-							style={styles.input}
-							placeholder="Título"
-							value={form.title}
-							onChangeText={(v) => setForm((f) => ({ ...f, title: v }))}
-						/>
-						<Picker
-							selectedValue={form.category}
-							onValueChange={(v: string) =>
-								setForm((f) => ({ ...f, category: v }))
-							}
-							style={{ marginBottom: 16 }}
-						>
-							<Picker.Item label="Selecione uma categoria" value="" />
-							{CATEGORIAS_PADRAO.map((cat) => (
-								<Picker.Item
-									key={cat.value}
-									label={cat.label}
-									value={cat.value}
+						<ScrollView showsVerticalScrollIndicator={false}>
+							<ThemedText
+								style={{ fontSize: 22, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: theme.text }}
+							>
+								{form.type === "income" ? "Nova Receita" : "Nova Despesa"}
+							</ThemedText>
+							<TextInput
+								style={[styles.input, styles.inputModern]}
+								placeholder="Título"
+								placeholderTextColor={theme.gray}
+								value={form.title}
+								onChangeText={(v) => setForm((f) => ({ ...f, title: v }))}
+								numberOfLines={1}
+								textAlignVertical="center"
+							/>
+							{form.type === "income" ? (
+								<TextInput
+									style={[styles.input, styles.inputModern]}
+									placeholder="Origem (ex: Salário, Investimentos)"
+									placeholderTextColor={theme.gray}
+									value={form.source || ""}
+									onChangeText={(v) => setForm((f) => ({ ...f, source: v, category: v }))}
+									numberOfLines={1}
+									textAlignVertical="center"
 								/>
-							))}
-						</Picker>
-						<TextInput
-							style={styles.input}
-							placeholder="Valor"
-							value={form.amount ? String(form.amount) : ""}
-							onChangeText={(v) => {
-								const valor = v.replace(",", ".");
-								setForm((f) => ({
-									...f,
-									amount: Number.parseFloat(valor) || 0,
-								}));
-							}}
-							keyboardType="decimal-pad"
-						/>
-						<TextInput
-							style={styles.input}
-							placeholder="Data (YYYY-MM-DD)"
-							value={form.date}
-							onChangeText={(v) => setForm((f) => ({ ...f, date: v }))}
-						/>
-						<View
-							style={{
-								flexDirection: "row",
-								justifyContent: "flex-end",
-								marginTop: 16,
-							}}
-						>
-							<TouchableOpacity
-								onPress={() => setModalVisible(false)}
-								style={{ marginRight: 16 }}
-							>
-								<ThemedText style={{ color: theme.error }}>Cancelar</ThemedText>
-							</TouchableOpacity>
-							<TouchableOpacity
-								onPress={handleSave}
-								disabled={saving}
-								style={{
-									backgroundColor: theme.tint,
-									borderRadius: 8,
-									paddingHorizontal: 18,
-									paddingVertical: 8,
+							) : (
+								<View style={styles.pickerWrapper}>
+									<Picker
+										selectedValue={form.category}
+										onValueChange={(v: string) => setForm((f) => ({ ...f, category: v }))}
+										style={{ color: form.category ? theme.text : theme.gray }}
+									>
+										<Picker.Item label="Selecione uma categoria" value="" color={theme.gray} />
+										{CATEGORIAS_PADRAO.map((cat) => (
+											<Picker.Item
+												key={cat.value}
+												label={cat.label}
+												value={cat.value}
+											/>
+										))}
+									</Picker>
+								</View>
+							)}
+							<TextInput
+								style={[styles.input, styles.inputModern]}
+								placeholder="Valor"
+								placeholderTextColor={theme.gray}
+								value={form.amountStr ?? ""}
+								onChangeText={(v) => {
+									let valor = v.replace(/[^0-9.,]/g, "");
+									const match = valor.match(/^(\d*)([.,]?(\d{0,2})?)?/);
+									if (match) valor = match[1] + (match[2] || "");
+									setForm((f) => ({ ...f, amountStr: valor }));
 								}}
-							>
-								<ThemedText style={{ color: "#fff", fontWeight: "bold" }}>
-									{saving ? "Salvando..." : "Salvar"}
+								keyboardType="decimal-pad"
+								numberOfLines={1}
+								textAlignVertical="center"
+							/>
+							<TextInput
+								style={[styles.input, styles.inputModern]}
+								placeholder="Data (YYYY-MM-DD)"
+								placeholderTextColor={theme.gray}
+								value={form.date}
+								onChangeText={(v) => setForm((f) => ({ ...f, date: v }))}
+								numberOfLines={1}
+								textAlignVertical="center"
+							/>
+							{form.type === "expense" && (
+								<TextInput
+									style={[styles.input, styles.inputModern]}
+									placeholder="Observações (opcional)"
+									placeholderTextColor={theme.gray}
+									value={form.notes || ""}
+									onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))}
+									multiline
+									numberOfLines={3}
+									textAlignVertical="top"
+								/>
+							)}
+							<View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20, marginTop: 4 }}>
+								<TouchableOpacity
+									style={[
+										styles.checkbox,
+										form.is_recurring && { backgroundColor: theme.tint, borderColor: theme.tint },
+									]}
+									onPress={() => setForm((f) => ({ ...f, is_recurring: !f.is_recurring }))}
+									activeOpacity={0.7}
+								>
+									{form.is_recurring && (
+										<Ionicons name="checkmark" size={18} color="#fff" />
+									)}
+								</TouchableOpacity>
+								<ThemedText style={{ marginLeft: 10, color: theme.text, fontSize: 15 }}>Transação recorrente</ThemedText>
+							</View>
+							<View style={{ flexDirection: "row", marginVertical: 10, gap: 10 }}>
+								<TouchableOpacity
+									style={[
+										styles.typeButton,
+										form.type === "income" && { backgroundColor: theme.tint, shadowColor: theme.tint, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
+									]}
+									onPress={() => setForm((f) => ({ ...f, type: "income" }))}
+									activeOpacity={0.85}
+								>
+									<Ionicons name="cash-outline" size={18} color={form.type === "income" ? "#fff" : theme.text} style={{ marginRight: 6 }} />
+									<ThemedText
+										style={[
+											styles.typeButtonText,
+											form.type === "income" && { color: "#fff" },
+										]}
+									>
+										Receita
+									</ThemedText>
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={[
+										styles.typeButton,
+										form.type === "expense" && { backgroundColor: theme.error, shadowColor: theme.error, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
+									]}
+									onPress={() => setForm((f) => ({ ...f, type: "expense" }))}
+									activeOpacity={0.85}
+								>
+									<Ionicons name="cart-outline" size={18} color={form.type === "expense" ? "#fff" : theme.text} style={{ marginRight: 6 }} />
+									<ThemedText
+										style={[
+											styles.typeButtonText,
+											form.type === "expense" && { color: "#fff" },
+										]}
+									>
+										Despesa
+									</ThemedText>
+								</TouchableOpacity>
+							</View>
+							{formError && (
+								<ThemedText style={{ color: theme.error, marginBottom: 16, textAlign: "center" }}>
+									{formError}
 								</ThemedText>
-							</TouchableOpacity>
-						</View>
+							)}
+							<View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
+								<TouchableOpacity
+									style={[styles.button, { backgroundColor: theme.gray, minWidth: 100, alignItems: "center", shadowColor: theme.gray, shadowOpacity: 0.10, shadowRadius: 6, elevation: 1 }]}
+									onPress={() => setModalVisible(false)}
+									activeOpacity={0.8}
+								>
+									<ThemedText style={{ color: "#fff", fontWeight: "bold" }}>Cancelar</ThemedText>
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={[styles.button, { backgroundColor: theme.tint, minWidth: 100, alignItems: "center", shadowColor: theme.tint, shadowOpacity: 0.15, shadowRadius: 8, elevation: 2 }]}
+									onPress={handleSave}
+									disabled={saving}
+									activeOpacity={0.8}
+								>
+									{saving ? (
+										<ActivityIndicator color="#fff" />
+									) : (
+										<ThemedText style={{ color: "#fff", fontWeight: "bold" }}>Salvar</ThemedText>
+									)}
+								</TouchableOpacity>
+							</View>
+						</ScrollView>
 					</View>
 				</View>
 			</Modal>
@@ -576,10 +702,62 @@ const styles = StyleSheet.create({
 		shadowRadius: 8,
 	},
 	input: {
-		height: 40,
 		borderColor: "gray",
 		borderWidth: 1,
 		marginBottom: 12,
-		padding: 10,
+		padding: 11,
+	},
+	inputModern: {
+		backgroundColor: '#f6f6f7',
+		borderWidth: 0,
+		borderRadius: 12,
+		fontSize: 15,
+		color: '#222',
+		marginBottom: 18,
+		paddingHorizontal: 10,
+		paddingVertical: 14,
+		shadowColor: '#000',
+		shadowOpacity: 0.03,
+		shadowRadius: 2,
+		elevation: 1,
+	},
+	pickerWrapper: {
+		backgroundColor: '#f6f6f7',
+		borderRadius: 12,
+		marginBottom: 18,
+		paddingHorizontal: 4,
+		paddingVertical: 2,
+	},
+	checkbox: {
+		width: 22,
+		height: 22,
+		borderWidth: 2,
+		borderColor: '#ccc',
+		borderRadius: 6,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#fff',
+		marginRight: 2,
+	},
+	typeButton: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 14,
+		borderRadius: 10,
+		backgroundColor: '#f6f6f7',
+		marginHorizontal: 2,
+	},
+	typeButtonText: {
+		fontSize: 16,
+		fontWeight: 'bold',
+	},
+	button: {
+		paddingVertical: 14,
+		borderRadius: 10,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginHorizontal: 2,
 	},
 });
