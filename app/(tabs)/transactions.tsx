@@ -2,6 +2,8 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
+import Feather from '@expo/vector-icons/Feather';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from "@react-native-picker/picker";
 import React, { useState } from "react";
 import {
@@ -16,6 +18,7 @@ import {
 	View,
 	useColorScheme,
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTransactions } from "../TransactionsContext";
 import type { Transaction } from "../supabaseClient";
 
@@ -30,6 +33,177 @@ const CATEGORIAS_DESPESA = [
 	{ label: "Serviços", value: "Serviços" },
 	{ label: "Outros", value: "Outros" },
 ];
+
+const styles = StyleSheet.create({
+	container: {
+		flex: 1,
+	},
+	filterContainer: {
+		flexDirection: "row",
+		padding: 16,
+		gap: 8,
+	},
+	filterButton: {
+		flex: 1,
+		paddingVertical: 8,
+		paddingHorizontal: 16,
+		borderRadius: 20,
+		backgroundColor: "#f5f5f5",
+		alignItems: "center",
+	},
+	filterButtonText: {
+		fontSize: 14,
+		color: "#666",
+	},
+	listContent: {
+		padding: 16,
+	},
+	transactionCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+		borderRadius: 18,
+		paddingVertical: 18,
+		paddingHorizontal: 20,
+		marginBottom: 18,
+		shadowColor: '#000',
+		shadowOpacity: 0.07,
+		shadowRadius: 8,
+		elevation: 2,
+		gap: 12,
+		minHeight: 90,
+	},
+	cardLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1.5,
+		minWidth: 0,
+	},
+	cardRight: {
+		flex: 1,
+		alignItems: 'flex-end',
+		justifyContent: 'center',
+		minWidth: 0,
+	},
+	cardIconWrap: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: '#f6f6f7',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: 12,
+	},
+	cardInfo: {
+		flex: 1,
+		minWidth: 0,
+	},
+	cardTitle: {
+		fontSize: 16,
+		fontWeight: 'bold',
+		color: '#222',
+		marginBottom: 2,
+	},
+	cardCategory: {
+		fontSize: 14,
+		color: '#888',
+		marginBottom: 2,
+	},
+	cardDate: {
+		fontSize: 12,
+		color: '#bbb',
+	},
+	cardActions: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+		marginTop: 8,
+	},
+	actionBtn: {
+		padding: 8,
+		borderRadius: 8,
+		backgroundColor: '#f6f6f7',
+		marginHorizontal: 2,
+	},
+	cardValue: {
+		fontSize: 17,
+		fontWeight: 'bold',
+		marginBottom: 2,
+	},
+	incomeValue: {
+		color: '#4CAF50',
+	},
+	expenseValue: {
+		color: '#FF5252',
+	},
+	input: {
+		borderWidth: 1,
+		borderColor: "#ccc",
+		padding: 12,
+		borderRadius: 8,
+		marginBottom: 16,
+	},
+	inputModern: {
+		backgroundColor: '#f6f6f7',
+		borderWidth: 0,
+		borderRadius: 12,
+		fontSize: 15,
+		color: '#222',
+		marginBottom: 18,
+		paddingHorizontal: 10,
+		paddingVertical: 14,
+		shadowColor: '#000',
+		shadowOpacity: 0.03,
+		shadowRadius: 2,
+		elevation: 1,
+	},
+	pickerWrapper: {
+		backgroundColor: '#f6f6f7',
+		borderRadius: 12,
+		marginBottom: 18,
+		paddingHorizontal: 4,
+		paddingVertical: 2,
+	},
+	typeButton: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 14,
+		borderRadius: 10,
+		backgroundColor: '#f6f6f7',
+		marginHorizontal: 2,
+	},
+	typeButtonText: {
+		fontSize: 16,
+		fontWeight: 'bold',
+	},
+	checkbox: {
+		width: 22,
+		height: 22,
+		borderWidth: 2,
+		borderColor: '#ccc',
+		borderRadius: 6,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#fff',
+		marginRight: 2,
+	},
+	button: {
+		paddingVertical: 14,
+		borderRadius: 10,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginHorizontal: 2,
+	},
+});
+
+const MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+
+const getMonthYear = (dateStr: string) => {
+	const [year, month] = dateStr.split('-');
+	return { year: Number(year), month: Number(month) - 1 };
+};
 
 export default function TransactionsScreen() {
 	const [selectedFilter, setSelectedFilter] = useState<
@@ -62,10 +236,16 @@ export default function TransactionsScreen() {
 	});
 	const [saving, setSaving] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
+	const [showDatePicker, setShowDatePicker] = useState(false);
+	const today = new Date();
+	const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
+	const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+	const [showMonthPicker, setShowMonthPicker] = useState(false);
 
+	// Filtro de mês/ano nas transações
 	const filteredTransactions = transactions.filter((transaction) => {
-		if (selectedFilter === "all") return true;
-		return transaction.type === selectedFilter;
+		const { year, month } = getMonthYear(transaction.date);
+		return year === selectedYear && month === selectedMonth && (selectedFilter === 'all' || transaction.type === selectedFilter);
 	});
 
 	const openAddModal = () => {
@@ -138,6 +318,7 @@ export default function TransactionsScreen() {
 				await edit("", payload); // addTransacao também pode ser chamado via edit('')
 			}
 			setModalVisible(false);
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		} catch (e) {
 			setFormError("Não foi possível salvar a transação.");
 		}
@@ -153,6 +334,7 @@ export default function TransactionsScreen() {
 				onPress: async () => {
 					try {
 						await remove(id, type);
+					// eslint-disable-next-line @typescript-eslint/no-unused-vars
 					} catch (e) {
 						Alert.alert("Erro", "Não foi possível excluir.");
 					}
@@ -162,457 +344,423 @@ export default function TransactionsScreen() {
 	};
 
 	const renderTransaction = ({ item }: { item: Transaction }) => (
-		<TouchableOpacity
-			style={styles.transactionItem}
-			onPress={() => openEditModal(item)}
-			onLongPress={() => item.id && handleDelete(item.id, item.type)}
-		>
-			<View style={styles.transactionIcon}>
-				<Ionicons
-					name={item.type === "income" ? "cash-outline" : "cart-outline"}
-					size={24}
-					color={item.type === "income" ? "#4CAF50" : "#0a7ea4"}
-				/>
+		<View style={styles.transactionCard}>
+			<View style={styles.cardLeft}>
+				<View style={styles.cardIconWrap}>
+					<Ionicons
+						name={item.type === "income" ? "cash-outline" : "cart-outline"}
+						size={28}
+						color={item.type === "income" ? theme.tint : theme.error}
+					/>
+				</View>
+				<View style={styles.cardInfo}>
+					<ThemedText style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
+						{item.title?.trim() ? item.title : "Sem título"}
+					</ThemedText>
+					<ThemedText style={styles.cardCategory} numberOfLines={1} ellipsizeMode="tail">
+						{item.type === "income"
+							? (item.source?.trim() ? item.source : "Sem categoria")
+							: (item.category?.trim() ? item.category : "Sem categoria")}
+					</ThemedText>
+					<ThemedText style={styles.cardDate} numberOfLines={1} ellipsizeMode="tail">{item.date}</ThemedText>
+				</View>
 			</View>
-			<View style={styles.transactionInfo}>
-				<ThemedText
-					style={styles.transactionTitle}
-					numberOfLines={1}
-					ellipsizeMode="tail"
-				>
-					{item.title?.trim() ? item.title : "Sem título"}
-				</ThemedText>
-				<ThemedText
-					style={styles.transactionCategory}
-					numberOfLines={1}
-					ellipsizeMode="tail"
-				>
-					{item.type === "income"
-						? item.source?.trim()
-							? item.source
-							: "Sem categoria"
-						: item.category?.trim()
-							? item.category
-							: "Sem categoria"}
-				</ThemedText>
-				<ThemedText style={styles.transactionDate}>{item.date}</ThemedText>
-			</View>
-			<View style={styles.transactionAmount}>
+			<View style={styles.cardRight}>
 				<ThemedText
 					style={[
-						styles.transactionValue,
-						item.type === "income" ? styles.income : styles.expense,
+						styles.cardValue,
+						item.type === "income" ? styles.incomeValue : styles.expenseValue,
 					]}
+					numberOfLines={1}
+					ellipsizeMode="tail"
 				>
 					{item.type === "income" ? "+" : "-"}R$ {item.amount.toFixed(2)}
 				</ThemedText>
+				<View style={styles.cardActions}>
+					<TouchableOpacity
+						onPress={() => item.id && handleDelete(item.id, item.type)}
+						style={styles.actionBtn}
+						activeOpacity={0.7}
+					>
+						<Feather name="trash-2" size={20} color={theme.error} />
+					</TouchableOpacity>
+					<TouchableOpacity
+						onPress={() => openEditModal(item)}
+						style={styles.actionBtn}
+						activeOpacity={0.7}
+					>
+						<Feather name="edit-3" size={20} color={theme.tint} />
+					</TouchableOpacity>
+				</View>
 			</View>
-			<TouchableOpacity
-				onPress={() => openEditModal(item)}
-				style={{ marginLeft: 8 }}
-			>
-				<Ionicons name="pencil-outline" size={20} color="#888" />
-			</TouchableOpacity>
-		</TouchableOpacity>
+		</View>
 	);
 
 	return (
-		<ThemedView style={styles.container}>
-			{/* Filter Buttons */}
-			<View style={styles.filterContainer}>
-				<TouchableOpacity
-					style={[
-						styles.filterButton,
-						selectedFilter === "all" && { backgroundColor: theme.tint },
-					]}
-					onPress={() => setSelectedFilter("all")}
-				>
-					<ThemedText
-						style={[
-							styles.filterButtonText,
-							selectedFilter === "all" && { color: "#fff", fontWeight: "bold" },
-						]}
+		<SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom', 'left', 'right']}>
+			<ThemedView style={styles.container}>
+				{/* Filtro de mês/ano */}
+				<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 2 }}>
+					<TouchableOpacity
+						style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.tint, borderRadius: 18, paddingHorizontal: 18, paddingVertical: 8 }}
+						onPress={() => setShowMonthPicker(true)}
+						activeOpacity={0.85}
 					>
-						Todos
-					</ThemedText>
-				</TouchableOpacity>
-				<TouchableOpacity
-					style={[
-						styles.filterButton,
-						selectedFilter === "income" && { backgroundColor: theme.tint },
-					]}
-					onPress={() => setSelectedFilter("income")}
-				>
-					<ThemedText
-						style={[
-							styles.filterButtonText,
-							selectedFilter === "income" && {
-								color: "#fff",
-								fontWeight: "bold",
-							},
-						]}
-					>
-						Receitas
-					</ThemedText>
-				</TouchableOpacity>
-				<TouchableOpacity
-					style={[
-						styles.filterButton,
-						selectedFilter === "expense" && { backgroundColor: theme.tint },
-					]}
-					onPress={() => setSelectedFilter("expense")}
-				>
-					<ThemedText
-						style={[
-							styles.filterButtonText,
-							selectedFilter === "expense" && {
-								color: "#fff",
-								fontWeight: "bold",
-							},
-						]}
-					>
-						Despesas
-					</ThemedText>
-				</TouchableOpacity>
-			</View>
+						<Ionicons name="calendar-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+						<ThemedText style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{MONTHS[selectedMonth]} {selectedYear}</ThemedText>
+						<Ionicons name="chevron-down" size={18} color="#fff" style={{ marginLeft: 8 }} />
+					</TouchableOpacity>
+				</View>
 
-			{/* Transactions List */}
-			{loading ? (
-				<ActivityIndicator
-					size="large"
-					color={theme.tint}
-					style={{ marginTop: 40 }}
-				/>
-			) : (
-				<FlatList
-					data={filteredTransactions}
-					renderItem={renderTransaction}
-					keyExtractor={(item) => item.id ?? ""}
-					contentContainerStyle={styles.listContent}
-					showsVerticalScrollIndicator={false}
-				/>
-			)}
+				{/* Filter Buttons */}
+				<View style={styles.filterContainer}>
+					<TouchableOpacity
+						style={[
+							styles.filterButton,
+							selectedFilter === "all" && { backgroundColor: theme.tint },
+						]}
+						onPress={() => setSelectedFilter("all")}
+					>
+						<ThemedText
+							style={[
+								styles.filterButtonText,
+								selectedFilter === "all" && { color: "#fff", fontWeight: "bold" },
+							]}
+						>
+							Todos
+						</ThemedText>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={[
+							styles.filterButton,
+							selectedFilter === "income" && { backgroundColor: theme.tint },
+						]}
+						onPress={() => setSelectedFilter("income")}
+					>
+						<ThemedText
+							style={[
+								styles.filterButtonText,
+								selectedFilter === "income" && {
+									color: "#fff",
+									fontWeight: "bold",
+								},
+							]}
+						>
+							Receitas
+						</ThemedText>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={[
+							styles.filterButton,
+							selectedFilter === "expense" && { backgroundColor: theme.tint },
+						]}
+						onPress={() => setSelectedFilter("expense")}
+					>
+						<ThemedText
+							style={[
+								styles.filterButtonText,
+								selectedFilter === "expense" && {
+									color: "#fff",
+									fontWeight: "bold",
+								},
+							]}
+						>
+							Despesas
+						</ThemedText>
+					</TouchableOpacity>
+				</View>
 
-			{/* Add/Edit Modal */}
-			<Modal visible={modalVisible} animationType="slide" transparent>
-				<View
-					style={{
-						flex: 1,
-						backgroundColor: "rgba(0,0,0,0.2)",
-						justifyContent: "center",
-						alignItems: "center",
-					}}
-				>
+				{/* Transactions List */}
+				{loading ? (
+					<ActivityIndicator
+						size="large"
+						color={theme.tint}
+						style={{ marginTop: 40 }}
+					/>
+				) : (
+					<FlatList
+						data={filteredTransactions}
+						renderItem={renderTransaction}
+						keyExtractor={(item) => item.id ?? ""}
+						contentContainerStyle={styles.listContent}
+						showsVerticalScrollIndicator={false}
+					/>
+				)}
+
+				{/* Add/Edit Modal */}
+				<Modal visible={modalVisible} animationType="slide" transparent>
 					<View
 						style={{
-							backgroundColor: "#fff",
-							borderRadius: 16,
-							padding: 24,
-							width: "90%",
-							maxHeight: "80%",
+							flex: 1,
+							backgroundColor: "rgba(0,0,0,0.2)",
+							justifyContent: "center",
+							alignItems: "center",
 						}}
 					>
-						<ScrollView>
-							<ThemedText
-								style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}
-							>
-								{editing ? "Editar" : "Nova"} Transação
-							</ThemedText>
-
-							<TextInput
-								style={styles.input}
-								placeholder="Título"
-								value={form.title}
-								onChangeText={(v) => setForm((f) => ({ ...f, title: v }))}
-							/>
-
-							{form.type === "income" ? (
-								<TextInput
-									style={styles.input}
-									placeholder="Origem (ex: Salário, Investimentos)"
-									value={form.source || ""}
-									onChangeText={(v) =>
-										setForm((f) => ({ ...f, source: v, category: v }))
-									}
-								/>
-							) : (
-								<Picker
-									selectedValue={form.category}
-									onValueChange={(v: string) =>
-										setForm((f) => ({ ...f, category: v }))
-									}
-									style={{ marginBottom: 16 }}
+						<View
+							style={{
+								backgroundColor: "#fff",
+								borderRadius: 20,
+								padding: 28,
+								width: "96%",
+								maxHeight: "85%",
+								shadowColor: theme.tint,
+								shadowOpacity: 0.08,
+								shadowRadius: 16,
+								elevation: 8,
+							}}
+						>
+							<ScrollView showsVerticalScrollIndicator={false}>
+								<ThemedText
+									style={{ fontSize: 22, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: theme.text }}
 								>
-									<Picker.Item label="Selecione uma categoria" value="" />
-									{CATEGORIAS_DESPESA.map((cat) => (
-										<Picker.Item
-											key={cat.value}
-											label={cat.label}
-											value={cat.value}
-										/>
-									))}
-								</Picker>
-							)}
-
-							<TextInput
-								style={styles.input}
-								placeholder="Valor"
-								value={form.amountStr ?? ""}
-								onChangeText={(v) => {
-									let valor = v.replace(/[^0-9.,]/g, "");
-									const match = valor.match(/^(\d*)([.,]?(\d{0,2})?)?/);
-									if (match) valor = match[1] + (match[2] || "");
-									setForm((f) => ({ ...f, amountStr: valor }));
-								}}
-								keyboardType="decimal-pad"
-							/>
-
-							<TextInput
-								style={styles.input}
-								placeholder="Data (YYYY-MM-DD)"
-								value={form.date}
-								onChangeText={(v) => setForm((f) => ({ ...f, date: v }))}
-							/>
-
-							{form.type === "expense" && (
-								<TextInput
-									style={styles.input}
-									placeholder="Observações (opcional)"
-									value={form.notes || ""}
-									onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))}
-									multiline
-									numberOfLines={3}
-								/>
-							)}
-
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									marginBottom: 16,
-								}}
-							>
-								<TouchableOpacity
-									style={[
-										styles.checkbox,
-										form.is_recurring && { backgroundColor: theme.tint },
-									]}
-									onPress={() =>
-										setForm((f) => ({ ...f, is_recurring: !f.is_recurring }))
-									}
-								>
-									{form.is_recurring && (
-										<Ionicons name="checkmark" size={16} color="#fff" />
-									)}
-								</TouchableOpacity>
-								<ThemedText style={{ marginLeft: 8 }}>
-									Transação recorrente
+									{editing ? "Editar Transação" : "Nova Transação"}
 								</ThemedText>
-							</View>
 
-							<View style={{ flexDirection: "row", marginVertical: 8 }}>
+								<TextInput
+									style={[styles.input, styles.inputModern]}
+									placeholder="Título"
+									placeholderTextColor={theme.gray}
+									value={form.title}
+									onChangeText={(v) => setForm((f) => ({ ...f, title: v }))}
+									numberOfLines={1}
+									textAlignVertical="center"
+								/>
+
+								{form.type === "income" ? (
+									<TextInput
+										style={[styles.input, styles.inputModern]}
+										placeholder="Origem (ex: Salário, Investimentos)"
+										placeholderTextColor={theme.gray}
+										value={form.source || ""}
+										onChangeText={(v) => setForm((f) => ({ ...f, source: v, category: v }))}
+										numberOfLines={1}
+										textAlignVertical="center"
+									/>
+								) : (
+									<View style={styles.pickerWrapper}>
+										<Picker
+											selectedValue={form.category}
+											onValueChange={(v: string) => setForm((f) => ({ ...f, category: v }))}
+											style={{ color: form.category ? theme.text : theme.gray }}
+										>
+											<Picker.Item label="Selecione uma categoria" value="" color={theme.gray} />
+											{CATEGORIAS_DESPESA.map((cat) => (
+												<Picker.Item
+													key={cat.value}
+													label={cat.label}
+													value={cat.value}
+												/>
+											))}
+										</Picker>
+									</View>
+								)}
+
+								<TextInput
+									style={[styles.input, styles.inputModern]}
+									placeholder="Valor"
+									placeholderTextColor={theme.gray}
+									value={form.amountStr ?? ""}
+									onChangeText={(v) => {
+										let valor = v.replace(/[^0-9.,]/g, "");
+										const match = valor.match(/^(\d*)([.,]?(\d{0,2})?)?/);
+										if (match) valor = match[1] + (match[2] || "");
+										setForm((f) => ({ ...f, amountStr: valor }));
+									}}
+									keyboardType="decimal-pad"
+									numberOfLines={1}
+									textAlignVertical="center"
+								/>
+
 								<TouchableOpacity
-									style={[
-										styles.typeButton,
-										form.type === "income" && { backgroundColor: theme.tint },
-									]}
-									onPress={() => setForm((f) => ({ ...f, type: "income" }))}
+									style={[styles.input, styles.inputModern, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+									onPress={() => setShowDatePicker(true)}
+									activeOpacity={0.8}
 								>
-									<ThemedText
-										style={[
-											styles.typeButtonText,
-											form.type === "income" && { color: "#fff" },
-										]}
-									>
-										Receita
+									<ThemedText style={{ color: form.date ? theme.text : theme.gray, fontSize: 15 }}>
+										{form.date ? form.date.split('-').reverse().join('/') : 'Selecione a data'}
 									</ThemedText>
+									<Ionicons name="calendar-outline" size={20} color={theme.tint} />
 								</TouchableOpacity>
-								<TouchableOpacity
-									style={[
-										styles.typeButton,
-										form.type === "expense" && { backgroundColor: theme.tint },
-									]}
-									onPress={() => setForm((f) => ({ ...f, type: "expense" }))}
-								>
-									<ThemedText
+
+								{showDatePicker && (
+									<DateTimePicker
+										value={form.date ? new Date(form.date) : new Date()}
+										mode="date"
+										display="default"
+										onChange={(_, selectedDate) => {
+											setShowDatePicker(false);
+											if (selectedDate) {
+												const yyyy = selectedDate.getFullYear();
+												const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+												const dd = String(selectedDate.getDate()).padStart(2, '0');
+												setForm((f) => ({ ...f, date: `${yyyy}-${mm}-${dd}` }));
+											}
+										}}
+										maximumDate={new Date(2100, 11, 31)}
+										minimumDate={new Date(2000, 0, 1)}
+									/>
+								)}
+
+								{form.type === "expense" && (
+									<TextInput
+										style={[styles.input, styles.inputModern]}
+										placeholder="Observações (opcional)"
+										placeholderTextColor={theme.gray}
+										value={form.notes || ""}
+										onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))}
+										multiline
+										numberOfLines={3}
+										textAlignVertical="top"
+									/>
+								)}
+
+								<View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20, marginTop: 4 }}>
+									<TouchableOpacity
 										style={[
-											styles.typeButtonText,
-											form.type === "expense" && { color: "#fff" },
+											styles.checkbox,
+											form.is_recurring && { backgroundColor: theme.tint, borderColor: theme.tint },
 										]}
+										onPress={() => setForm((f) => ({ ...f, is_recurring: !f.is_recurring }))}
+										activeOpacity={0.7}
 									>
-										Despesa
+										{form.is_recurring && (
+											<Ionicons name="checkmark" size={18} color="#fff" />
+										)}
+									</TouchableOpacity>
+									<ThemedText style={{ marginLeft: 10, color: theme.text, fontSize: 15 }}>Transação recorrente</ThemedText>
+								</View>
+
+								<View style={{ flexDirection: "row", marginVertical: 10, gap: 10 }}>
+									<TouchableOpacity
+										style={[
+											styles.typeButton,
+											form.type === "income" && { backgroundColor: theme.tint, shadowColor: theme.tint, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
+										]}
+										onPress={() => setForm((f) => ({ ...f, type: "income" }))}
+										activeOpacity={0.85}
+									>
+										<Ionicons name="cash-outline" size={18} color={form.type === "income" ? "#fff" : theme.text} style={{ marginRight: 6 }} />
+										<ThemedText
+											style={[
+												styles.typeButtonText,
+												form.type === "income" && { color: "#fff" },
+											]}
+										>
+											Receita
+										</ThemedText>
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={[
+											styles.typeButton,
+											form.type === "expense" && { backgroundColor: theme.error, shadowColor: theme.error, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
+										]}
+										onPress={() => setForm((f) => ({ ...f, type: "expense" }))}
+										activeOpacity={0.85}
+									>
+										<Ionicons name="cart-outline" size={18} color={form.type === "expense" ? "#fff" : theme.text} style={{ marginRight: 6 }} />
+										<ThemedText
+											style={[
+												styles.typeButtonText,
+												form.type === "expense" && { color: "#fff" },
+											]}
+										>
+											Despesa
+										</ThemedText>
+									</TouchableOpacity>
+								</View>
+
+								{formError && (
+									<ThemedText style={{ color: theme.error, marginBottom: 16, textAlign: "center" }}>
+										{formError}
 									</ThemedText>
-								</TouchableOpacity>
-							</View>
+								)}
 
-							{formError && (
-								<ThemedText style={{ color: "red", marginBottom: 16 }}>
-									{formError}
-								</ThemedText>
-							)}
-
-							<View
-								style={{
-									flexDirection: "row",
-									justifyContent: "flex-end",
-									gap: 8,
-								}}
-							>
-								<TouchableOpacity
-									style={[styles.button, { backgroundColor: "#ccc" }]}
-									onPress={() => setModalVisible(false)}
-								>
-									<ThemedText style={{ color: "#fff" }}>Cancelar</ThemedText>
-								</TouchableOpacity>
-								<TouchableOpacity
-									style={[styles.button, { backgroundColor: theme.tint }]}
-									onPress={handleSave}
-									disabled={saving}
-								>
-									{saving ? (
-										<ActivityIndicator color="#fff" />
-									) : (
-										<ThemedText style={{ color: "#fff" }}>Salvar</ThemedText>
-									)}
-								</TouchableOpacity>
-							</View>
-						</ScrollView>
+								<View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
+									<TouchableOpacity
+										style={[styles.button, { backgroundColor: theme.gray, minWidth: 100, alignItems: "center", shadowColor: theme.gray, shadowOpacity: 0.10, shadowRadius: 6, elevation: 1 }]}
+										onPress={() => setModalVisible(false)}
+										activeOpacity={0.8}
+									>
+										<ThemedText style={{ color: "#fff", fontWeight: "bold" }}>Cancelar</ThemedText>
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={[styles.button, { backgroundColor: theme.tint, minWidth: 100, alignItems: "center", shadowColor: theme.tint, shadowOpacity: 0.15, shadowRadius: 8, elevation: 2 }]}
+										onPress={handleSave}
+										disabled={saving}
+										activeOpacity={0.8}
+									>
+										{saving ? (
+											<ActivityIndicator color="#fff" />
+										) : (
+											<ThemedText style={{ color: "#fff", fontWeight: "bold" }}>Salvar</ThemedText>
+										)}
+									</TouchableOpacity>
+								</View>
+							</ScrollView>
+						</View>
 					</View>
-				</View>
-			</Modal>
+				</Modal>
 
-			{/* Botão flutuante para adicionar */}
-			<TouchableOpacity
-				style={{
-					position: "absolute",
-					bottom: 32,
-					right: 32,
-					backgroundColor: theme.tint,
-					width: 56,
-					height: 56,
-					borderRadius: 28,
-					alignItems: "center",
-					justifyContent: "center",
-					elevation: 4,
-				}}
-				onPress={openAddModal}
-			>
-				<Ionicons name="add" size={32} color="#fff" />
-			</TouchableOpacity>
-		</ThemedView>
+				{/* Botão flutuante para adicionar */}
+				<TouchableOpacity
+					style={{
+						position: "absolute",
+						bottom: 32,
+						right: 32,
+						backgroundColor: theme.tint,
+						width: 56,
+						height: 56,
+						borderRadius: 28,
+						alignItems: "center",
+						justifyContent: "center",
+						elevation: 4,
+					}}
+					onPress={openAddModal}
+				>
+					<Ionicons name="add" size={32} color="#fff" />
+				</TouchableOpacity>
+
+				{/* Modal de seleção de mês/ano */}
+				<Modal visible={showMonthPicker} animationType="fade" transparent>
+					<View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' }}>
+						<View style={{ backgroundColor: '#fff', borderRadius: 24, width: '90%', maxWidth: 400, paddingBottom: 18, overflow: 'hidden' }}>
+							{/* Header de navegação de ano */}
+							<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.tint, paddingVertical: 18, paddingHorizontal: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+								<TouchableOpacity onPress={() => setSelectedYear(y => y - 1)}>
+									<Ionicons name="chevron-back" size={26} color="#fff" />
+								</TouchableOpacity>
+								<ThemedText style={{ color: '#fff', fontWeight: 'bold', fontSize: 18 }}>{selectedYear}</ThemedText>
+								<TouchableOpacity onPress={() => setSelectedYear(y => y + 1)}>
+									<Ionicons name="chevron-forward" size={26} color="#fff" />
+								</TouchableOpacity>
+							</View>
+							{/* Grid de meses */}
+							<View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', padding: 18, backgroundColor: '#f6f6f7' }}>
+								{MONTHS.map((m, idx) => (
+									<TouchableOpacity
+										key={m}
+										style={{ width: '30%', marginVertical: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: idx === selectedMonth ? theme.tint : '#fff', paddingVertical: 12, shadowColor: idx === selectedMonth ? theme.tint : 'transparent', shadowOpacity: idx === selectedMonth ? 0.12 : 0, shadowRadius: 6, elevation: idx === selectedMonth ? 2 : 0 }}
+										onPress={() => { setSelectedMonth(idx); setShowMonthPicker(false); }}
+										activeOpacity={0.85}
+									>
+										<ThemedText style={{ color: idx === selectedMonth ? '#fff' : theme.text, fontWeight: idx === selectedMonth ? 'bold' : 'normal', fontSize: 15 }}>{m}</ThemedText>
+									</TouchableOpacity>
+								))}
+							</View>
+							{/* Ações */}
+							<View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, marginTop: 2 }}>
+								<TouchableOpacity onPress={() => setShowMonthPicker(false)}>
+									<ThemedText style={{ color: theme.tint, fontWeight: 'bold', fontSize: 15, paddingVertical: 10 }}>CANCELAR</ThemedText>
+								</TouchableOpacity>
+								<TouchableOpacity onPress={() => { setSelectedMonth(today.getMonth()); setSelectedYear(today.getFullYear()); setShowMonthPicker(false); }}>
+									<ThemedText style={{ color: theme.tint, fontWeight: 'bold', fontSize: 15, paddingVertical: 10 }}>MÊS ATUAL</ThemedText>
+								</TouchableOpacity>
+							</View>
+						</View>
+					</View>
+				</Modal>
+			</ThemedView>
+		</SafeAreaView>
 	);
 }
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
-	filterContainer: {
-		flexDirection: "row",
-		padding: 16,
-		gap: 8,
-	},
-	filterButton: {
-		flex: 1,
-		paddingVertical: 8,
-		paddingHorizontal: 16,
-		borderRadius: 20,
-		backgroundColor: "#f5f5f5",
-		alignItems: "center",
-	},
-	filterButtonActive: {
-		backgroundColor: "#0a7ea4",
-	},
-	filterButtonText: {
-		fontSize: 14,
-		color: "#666",
-	},
-	filterButtonTextActive: {
-		color: "#fff",
-		fontWeight: "500",
-	},
-	listContent: {
-		padding: 16,
-	},
-	transactionItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#f5f5f5",
-		padding: 16,
-		borderRadius: 12,
-		marginBottom: 12,
-	},
-	transactionIcon: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: "#fff",
-		justifyContent: "center",
-		alignItems: "center",
-		marginRight: 12,
-	},
-	transactionInfo: {
-		flex: 1,
-	},
-	transactionTitle: {
-		fontSize: 16,
-		fontWeight: "500",
-	},
-	transactionCategory: {
-		fontSize: 14,
-		opacity: 0.6,
-		marginTop: 2,
-	},
-	transactionAmount: {
-		alignItems: "flex-end",
-	},
-	transactionValue: {
-		fontSize: 16,
-		fontWeight: "bold",
-	},
-	transactionDate: {
-		fontSize: 12,
-		opacity: 0.6,
-		marginTop: 2,
-	},
-	income: {
-		color: "#4CAF50",
-	},
-	expense: {
-		color: "#FF5252",
-	},
-	input: {
-		borderWidth: 1,
-		borderColor: "#ccc",
-		padding: 12,
-		borderRadius: 8,
-		marginBottom: 16,
-	},
-	typeButton: {
-		flex: 1,
-		padding: 12,
-		borderRadius: 8,
-		backgroundColor: "#f5f5f5",
-		alignItems: "center",
-	},
-	typeButtonText: {
-		fontSize: 14,
-		fontWeight: "bold",
-	},
-	checkbox: {
-		width: 24,
-		height: 24,
-		borderRadius: 4,
-		borderWidth: 2,
-		borderColor: "#ccc",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	button: {
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		borderRadius: 8,
-		minWidth: 80,
-		alignItems: "center",
-	},
-});

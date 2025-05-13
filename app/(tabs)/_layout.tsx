@@ -29,10 +29,11 @@ export default function TabLayout() {
     <TransactionsProvider>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+          tabBarActiveTintColor: '#fff',
+          tabBarInactiveTintColor: '#fff',
           tabBarStyle: {
-            borderTopWidth: 1,
-            borderTopColor: colorScheme === 'dark' ? '#2C2C2C' : '#E5E5E5',
+            backgroundColor: Colors[colorScheme ?? 'light'].tint,
+            borderTopWidth: 0,
           },
         }}>
         <Tabs.Screen

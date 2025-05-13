@@ -1,20 +1,26 @@
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
+import Feather from '@expo/vector-icons/Feather';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from "@react-native-picker/picker";
-import React, { useState } from "react";
+import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
+import React, { useEffect, useState } from "react";
 import {
 	ActivityIndicator,
 	Modal,
-	SafeAreaView,
 	ScrollView,
+	StatusBar,
 	StyleSheet,
 	TextInput,
 	TouchableOpacity,
 	View,
-	useColorScheme,
+	useColorScheme
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTransactions } from '../TransactionsContext';
+import { getUser } from '../supabaseClient';
 
 const CATEGORIAS_PADRAO = [
 	{ label: "Alimentação", value: "Alimentação" },
@@ -33,7 +39,7 @@ export default function DashboardScreen() {
 	const isDark = colorScheme === "dark";
 	const theme = Colors[isDark ? "dark" : "light"];
 
-	const { transactions, loading, add, remove } = useTransactions();
+	const { transactions, loading, add } = useTransactions();
 	const [fabMenuVisible, setFabMenuVisible] = useState(false);
 	const [modalVisible, setModalVisible] = useState(false);
 	const [form, setForm] = useState<{
@@ -60,6 +66,32 @@ export default function DashboardScreen() {
 	);
 	const [saving, setSaving] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
+	const [showDatePicker, setShowDatePicker] = useState(false);
+	const [userName, setUserName] = useState<string>('');
+
+	useEffect(() => {
+		async function fetchUserName() {
+			try {
+				const user = await getUser();
+				if (user?.id) {
+					const supabaseUrl = 'https://yascliotrmqhvqbvrhsc.supabase.co';
+					const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc2NsaW90cm1xaHZxYnZyaHNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5NTA3NjksImV4cCI6MjA2MTUyNjc2OX0.Yh2Ebi1n6CPx2mVERHfA7G5w_kaF6_p7OImAF3qRj8o';
+					const token = await SecureStore.getItemAsync('supabase_token');
+					const { data } = await axios.get(`${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}`, {
+						headers: {
+							apikey: supabaseAnonKey,
+							Authorization: `Bearer ${token}`,
+						},
+					});
+					if (Array.isArray(data) && data[0]?.nome) {
+						const firstName = data[0].nome.split(' ')[0];
+						setUserName(firstName);
+					}
+				}
+			} catch {}
+		}
+		fetchUserName();
+	}, []);
 
 	const openAddModal = (type: "income" | "expense") => {
 		setForm({
@@ -121,14 +153,6 @@ export default function DashboardScreen() {
 		setSaving(false);
 	};
 
-	const handleDelete = async (id: string, type: "income" | "expense") => {
-		try {
-			await remove(id, type);
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		} catch (e) {
-			alert("Erro ao excluir transação.");
-		}
-	};
 
 	// Calcular receitas, despesas e saldo dinamicamente
 	const totalIncome = transactions
@@ -140,13 +164,12 @@ export default function DashboardScreen() {
 	const balance = totalIncome - totalExpense;
 
 	return (
-		<SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
+		<SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom', 'left', 'right']}>
+			<StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 			<View style={[styles.container, { backgroundColor: theme.background }]}>
 				{/* Top Bar */}
 				<View style={styles.topBar}>
-					<ThemedText style={[styles.topBarTitle, { color: theme.text }]}>
-						Principal
-					</ThemedText>
+					<ThemedText style={[styles.topBarTitle, { color: theme.text }]}>Bem-vindo{userName ? `, ${userName}` : ''}</ThemedText>
 					<View style={styles.topBarIcons}>
 						<TouchableOpacity style={styles.topBarIconBtn}>
 							<Ionicons
@@ -216,69 +239,45 @@ export default function DashboardScreen() {
 						</ThemedText>
 						<View style={styles.transactionList}>
 							{loading ? (
-								<ThemedText>Carregando...</ThemedText>
+								<View style={styles.loadingContainer}>
+									<Feather name="loader" size={36} color={theme.tint} style={{ opacity: 0.7, transform: [{ rotate: '0deg' }] }} />
+								</View>
 							) : transactions.length === 0 ? (
 								<ThemedText>Nenhuma transação encontrada.</ThemedText>
 							) : (
-								transactions.map((tx) => (
+								transactions.slice(0, 5).map((tx) => (
 									<View
 										key={tx.id}
 										style={[
-											styles.transactionItem,
+											styles.transactionCard,
 											{ backgroundColor: theme.card },
 										]}
 									>
-										<Ionicons
-											name={
-												tx.type === "income" ? "cash-outline" : "cart-outline"
-											}
-											size={22}
-											color={theme.tint}
-											style={styles.transactionIcon}
-										/>
-										<View style={styles.transactionInfo}>
-											<ThemedText
-												style={[styles.transactionTitle, { color: theme.text }]}
-												numberOfLines={1}
-												ellipsizeMode="tail"
-											>
+										<View style={styles.cardIconWrap}>
+											<Ionicons
+												name={tx.type === "income" ? "cash-outline" : "cart-outline"}
+												size={28}
+												color={tx.type === "income" ? theme.tint : theme.error}
+											/>
+										</View>
+										<View style={styles.cardInfo}>
+											<ThemedText style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
 												{tx.title?.trim() ? tx.title : "Sem título"}
 											</ThemedText>
-											<ThemedText
-												style={{ color: theme.gray, fontSize: 13, marginTop: 2 }}
-												numberOfLines={1}
-												ellipsizeMode="tail"
-											>
+											<ThemedText style={styles.cardCategory} numberOfLines={1} ellipsizeMode="tail">
 												{tx.type === "income"
 													? (tx.source?.trim() ? tx.source : "Sem categoria")
 													: (tx.category?.trim() ? tx.category : "Sem categoria")}
 											</ThemedText>
-											<ThemedText
-												style={[styles.transactionDate, { color: theme.gray }]}
-											>
-												{tx.date}
-											</ThemedText>
+											<ThemedText style={styles.cardDate}>{tx.date}</ThemedText>
 										</View>
-										<TouchableOpacity
-											onPress={() => handleDelete(tx.id || "", tx.type)}
-										>
-											<Ionicons
-												name="trash-outline"
-												size={20}
-												color={theme.error}
-											/>
-										</TouchableOpacity>
 										<ThemedText
 											style={[
-												tx.type === "income"
-													? styles.incomeValue
-													: styles.expenseValue,
-												{
-													color: tx.type === "income" ? theme.tint : theme.error,
-												},
+												styles.cardValue,
+												tx.type === "income" ? { color: '#4CAF50' } : { color: '#FF5252' },
 											]}
 										>
-											R$ {tx.amount}
+											{tx.type === "income" ? "+" : "-"}R$ {tx.amount.toFixed(2)}
 										</ThemedText>
 									</View>
 								))
@@ -432,15 +431,34 @@ export default function DashboardScreen() {
 									numberOfLines={1}
 									textAlignVertical="center"
 								/>
-								<TextInput
-									style={[styles.input, styles.inputModern]}
-									placeholder="Data (YYYY-MM-DD)"
-									placeholderTextColor={theme.gray}
-									value={form.date}
-									onChangeText={(v) => setForm((f) => ({ ...f, date: v }))}
-									numberOfLines={1}
-									textAlignVertical="center"
-								/>
+								<TouchableOpacity
+									style={[styles.input, styles.inputModern, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+									onPress={() => setShowDatePicker(true)}
+									activeOpacity={0.8}
+								>
+									<ThemedText style={{ color: form.date ? theme.text : theme.gray, fontSize: 15 }}>
+										{form.date ? form.date.split('-').reverse().join('/') : 'Selecione a data'}
+									</ThemedText>
+									<Ionicons name="calendar-outline" size={20} color={theme.tint} />
+								</TouchableOpacity>
+								{showDatePicker && (
+									<DateTimePicker
+										value={form.date ? new Date(form.date) : new Date()}
+										mode="date"
+										display="default"
+										onChange={(_, selectedDate) => {
+											setShowDatePicker(false);
+											if (selectedDate) {
+												const yyyy = selectedDate.getFullYear();
+												const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+												const dd = String(selectedDate.getDate()).padStart(2, '0');
+												setForm((f) => ({ ...f, date: `${yyyy}-${mm}-${dd}` }));
+											}
+										}}
+										maximumDate={new Date(2100, 11, 31)}
+										minimumDate={new Date(2000, 0, 1)}
+									/>
+								)}
 								{form.type === "expense" && (
 									<TextInput
 										style={[styles.input, styles.inputModern]}
@@ -643,27 +661,51 @@ const styles = StyleSheet.create({
 	transactionList: {
 		gap: 12,
 	},
-	transactionItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		padding: 16,
-		borderRadius: 12,
-		marginBottom: 8,
+	transactionCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+		borderRadius: 18,
+		padding: 18,
+		marginBottom: 16,
+		shadowColor: '#000',
+		shadowOpacity: 0.07,
+		shadowRadius: 8,
+		elevation: 2,
+		gap: 12,
 	},
-	transactionIcon: {
-		marginRight: 12,
+	cardIconWrap: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: '#f6f6f7',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: 10,
 	},
-	transactionInfo: {
+	cardInfo: {
 		flex: 1,
+		minWidth: 0,
 	},
-	transactionTitle: {
+	cardTitle: {
 		fontSize: 16,
-		fontWeight: "500",
+		fontWeight: 'bold',
+		color: '#222',
+		marginBottom: 2,
 	},
-	transactionDate: {
-		fontSize: 13,
-		opacity: 0.6,
-		marginTop: 2,
+	cardCategory: {
+		fontSize: 14,
+		color: '#888',
+		marginBottom: 2,
+	},
+	cardDate: {
+		fontSize: 12,
+		color: '#bbb',
+	},
+	cardValue: {
+		fontSize: 17,
+		fontWeight: 'bold',
+		marginLeft: 8,
 	},
 	fab: {
 		position: "absolute",
@@ -738,5 +780,11 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		marginHorizontal: 2,
+	},
+	loadingContainer: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 40,
 	},
 });
