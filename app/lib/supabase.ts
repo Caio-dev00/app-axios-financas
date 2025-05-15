@@ -1,4 +1,4 @@
-import axios, { AxiosError, isAxiosError } from 'axios';
+import axios, { AxiosError, AxiosHeaders, isAxiosError } from 'axios';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
@@ -28,15 +28,21 @@ export interface User {
 
 const supabaseClient = axios.create({
   baseURL: SUPABASE_URL,
-  headers: {
+  headers: new AxiosHeaders({
     'apikey': SUPABASE_ANON_KEY,
     'Content-Type': 'application/json',
-  },
+  }),
 });
 
 // Interceptor para adicionar o token de autenticação
 supabaseClient.interceptors.request.use(async (config) => {
-  config.headers['apikey'] = SUPABASE_ANON_KEY;
+  // Garantir que headers é uma instância de AxiosHeaders
+  if (!config.headers || !(config.headers instanceof AxiosHeaders)) {
+    config.headers = new AxiosHeaders();
+  }
+  
+  config.headers.set('apikey', SUPABASE_ANON_KEY);
+  config.headers.set('X-Client-Info', 'app-axios-financas');
   
   if (config.url && publicRoutes.some(route => config.url?.includes(route))) {
     return config;
@@ -44,21 +50,33 @@ supabaseClient.interceptors.request.use(async (config) => {
 
   try {
     const token = await SecureStore.getItemAsync('supabase_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    } else {
+    if (!token) {
       throw new Error('Usuário não autenticado');
     }
+    config.headers.set('Authorization', `Bearer ${token}`);
     return config;
-  } catch (error) {
-    return Promise.reject(error);
+  } catch (err) {
+    console.error('Erro no interceptor:', err);
+    return Promise.reject(err);
   }
 });
 
-// Interceptor para tratar erros de autenticação
+// Interceptor de resposta para tratar erros
 supabaseClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
+  response => response,
+  async (error: AxiosError) => {
+    console.error('Response error:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      headers: error.response?.headers,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: error.config?.headers,
+        data: error.config?.data
+      }
+    });
+
     if (isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
       await Promise.all([
         SecureStore.deleteItemAsync('supabase_token'),

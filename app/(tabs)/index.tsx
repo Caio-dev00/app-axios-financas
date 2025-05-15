@@ -128,22 +128,26 @@ export default function DashboardScreen() {
 		}
 		setSaving(true);
 		try {
+			console.log('Form data:', form);
 			const valorFloat = form.amountStr
 				? Number.parseFloat(form.amountStr.replace(",", "."))
 				: 0;
-			const payload = {
-				title: form.title,
+					const payload = {
+				title: form.title.trim(),
 				amount: valorFloat,
 				type: form.type,
 				date: form.date,
-				category: form.type === "expense" ? form.category : "",
-				source: form.type === "income" ? form.source : undefined,
+				category: form.type === "expense" ? form.category.trim() : undefined,
+				source: form.type === "income" ? (form.source?.trim() || '') : undefined,
 				is_recurring: form.is_recurring,
-				notes: form.notes,
+				notes: form.type === "expense" ? form.notes?.trim() : undefined
 			};
+			
+			console.log('Payload being sent:', payload);
 			await add(payload);
 			setModalVisible(false);
 		} catch (e: unknown) {
+			console.error('Error saving transaction:', e);
 			if (e && typeof e === "object" && "message" in e) {
 				setFormError((e as { message?: string }).message || "Erro ao salvar transação.");
 			} else {

@@ -2,44 +2,43 @@ import { isAxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import supabaseClient from './lib/supabase';
 
-export type Transaction = {
-	id?: string;
-	title: string;
-	amount: number;
-	type: "income" | "expense";
-	category: string;
-	date: string;
-	user_id?: string;
-	description?: string;
-	source?: string;
-	notes?: string;
-	is_recurring?: boolean;
-};
+export interface ExpenseTransaction {
+  id?: string;
+  description: string;
+  amount: number;
+  category: string;
+  date: string;
+  notes?: string;
+  is_recurring: boolean;
+  created_at?: string;
+  user_id?: string;
+  type: 'expense';
+}
 
 export interface IncomeTransaction {
-	id?: string;
-	description: string;
-	amount: number;
-	source: string;
-	date: string;
-	is_recurring?: boolean;
-	created_at?: string;
-	user_id?: string;
-	type: 'income';
+  id?: string;
+  description: string;
+  amount: number;
+  source: string;
+  date: string;
+  is_recurring: boolean;
+  created_at?: string;
+  user_id?: string;
+  type: 'income';
 }
 
-export interface ExpenseTransaction {
-	id?: string;
-	description: string;
-	amount: number;
-	category: string;
-	date: string;
-	notes?: string;
-	is_recurring?: boolean;
-	created_at?: string;
-	user_id?: string;
-	type: 'expense';
-}
+export type Transaction = {
+  id?: string;
+  title: string;
+  amount: number;
+  type: "income" | "expense";
+  category?: string;
+  date: string;
+  user_id?: string;
+  source?: string;
+  notes?: string;
+  is_recurring: boolean;
+};
 
 export interface UserProfile {
   id: string;
@@ -66,16 +65,21 @@ export const getUserId = async (): Promise<string | null> => {
 
 function handleTransactionError(error: unknown): never {
   console.error('Transaction error:', error);
-  if (error && typeof error === 'object' && 'isAxiosError' in error) {
-    const axiosError = error as { response?: { status?: number } };
-    if (axiosError.response?.status === 401 || axiosError.response?.status === 403) {
+  if (isAxiosError(error)) {
+    if (error.response?.status === 401 || error.response?.status === 403) {
       throw new Error('Sessão expirada. Por favor, faça login novamente.');
     }
-    if (axiosError.response?.status === 404) {
+    if (error.response?.status === 404) {
       throw new Error('Transação não encontrada.');
     }
-    if (axiosError.response?.status === 422) {
+    if (error.response?.status === 400) {
       throw new Error('Dados inválidos. Verifique os campos e tente novamente.');
+    }
+    if (error.response?.status === 422) {
+      throw new Error('Dados inválidos. Verifique os campos e tente novamente.');
+    }
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
     }
   }
   throw new Error('Erro ao processar a transação. Tente novamente.');
@@ -129,11 +133,7 @@ export const getTransacoes = async (): Promise<Transaction[]> => {
 };
 
 export const addTransacao = async (
-  transacao: Omit<Transaction, "id" | "user_id"> & {
-    source?: string;
-    notes?: string;
-    is_recurring?: boolean;
-  }
+  transacao: Omit<Transaction, "id" | "user_id">
 ): Promise<Transaction> => {
   try {
     // Validações
@@ -145,27 +145,76 @@ export const addTransacao = async (
     if (transacao.type === "expense" && !transacao.category?.trim())
       throw new Error("Categoria é obrigatória");
 
+    const user = await getUser();
+    if (!user) {
+      throw new Error("Usuário não autenticado");
+    }
+
     const table = transacao.type === "expense" ? "expenses" : "incomes";
-    const payload = {
-      description: transacao.title,
+    
+    // Criar payload específico para cada tipo
+    const basePayload = {
+      user_id: user.id,
+      description: transacao.title.trim(),
       amount: transacao.amount,
       date: transacao.date,
-      is_recurring: transacao.is_recurring || false,
-      ...(transacao.type === "expense"
-        ? { category: transacao.category, notes: transacao.notes }
-        : { source: transacao.source }),
+      is_recurring: transacao.is_recurring
     };
 
-    const { data } = await supabaseClient.post(`/rest/v1/${table}`, [payload], {
-      headers: { 'Prefer': 'return=representation' },
+    let payload;
+    if (transacao.type === "expense") {
+      payload = {
+        ...basePayload,
+        category: transacao.category!.trim(),
+        notes: transacao.notes?.trim(),
+      } as ExpenseTransaction;
+    } else {
+      payload = {
+        ...basePayload,
+        source: transacao.source!.trim(),
+      } as IncomeTransaction;
+    }
+
+    console.log('Payload para criação:', { table, payload });
+
+    const { data } = await supabaseClient.post(`/rest/v1/${table}`, payload, {
+      headers: { 
+        'Prefer': 'return=representation'
+      }
     });
 
+    if (!data?.[0]) {
+      console.error('Resposta inválida do servidor:', data);
+      throw new Error('Erro ao criar transação: Resposta inválida do servidor');
+    }
+
+    const createdData = data[0];
     return {
-      ...data[0],
+      id: createdData.id,
+      title: createdData.description,
+      amount: createdData.amount,
+      date: createdData.date,
       type: transacao.type,
-      title: data[0].description,
+      category: transacao.type === 'expense' ? createdData.category : undefined,
+      source: transacao.type === 'income' ? createdData.source : undefined,
+      notes: createdData.notes,
+      is_recurring: createdData.is_recurring,
+      user_id: createdData.user_id
     };
   } catch (error) {
+    console.error('Erro detalhado:', error);
+    if (isAxiosError(error)) {
+      console.error('Detalhes do erro:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers,
+          data: error.config?.data
+        }
+      });
+    }
     handleTransactionError(error);
   }
 };
@@ -193,13 +242,13 @@ export const updateTransacao = async (
     const table = transacao.type === "expense" ? "expenses" : "incomes";
     const payload = {
       ...(transacao.title && { description: transacao.title }),
-      ...(transacao.amount && { amount: transacao.amount }),
+      ...(transacao.amount !== undefined && { amount: transacao.amount }),
       ...(transacao.date && { date: transacao.date }),
       ...(transacao.is_recurring !== undefined && { is_recurring: transacao.is_recurring }),
       ...(transacao.type === "expense"
         ? {
             ...(transacao.category && { category: transacao.category }),
-            ...(transacao.notes && { notes: transacao.notes }),
+            ...(transacao.notes !== undefined && { notes: transacao.notes }),
           }
         : {
             ...(transacao.source && { source: transacao.source }),
@@ -209,6 +258,10 @@ export const updateTransacao = async (
     const { data } = await supabaseClient.patch(`/rest/v1/${table}?id=eq.${id}`, payload, {
       headers: { 'Prefer': 'return=representation' },
     });
+
+    if (!data?.[0]) {
+      throw new Error('Erro ao atualizar transação');
+    }
 
     return {
       ...data[0],
@@ -223,7 +276,24 @@ export const updateTransacao = async (
 export const deleteTransacao = async (id: string, type: "income" | "expense"): Promise<void> => {
   try {
     const table = type === "expense" ? "expenses" : "incomes";
-    await supabaseClient.delete(`/rest/v1/${table}?id=eq.${id}`);
+    
+    const user = await getUser();
+    if (!user) {
+      throw new Error("Usuário não autenticado");
+    }    const response = await supabaseClient.delete(`/rest/v1/${table}`, {
+      params: {
+        id: `eq.${id}`,
+        user_id: `eq.${user.id}`
+      },
+      headers: {
+        'Prefer': 'return=representation'
+      }
+    });
+
+    if (response.status !== 200 || !response.data) {
+      console.error('Erro ao excluir:', response);
+      throw new Error('Erro ao excluir transação');
+    }
   } catch (error) {
     handleTransactionError(error);
   }

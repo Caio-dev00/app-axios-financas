@@ -213,7 +213,7 @@ export default function TransactionsScreen() {
 	const isDark = colorScheme === "dark";
 	const theme = Colors[isDark ? "dark" : "light"];
 
-	const { transactions, loading, edit, remove } = useTransactions();
+	const { transactions, loading, edit, remove, add } = useTransactions();
 	const [modalVisible, setModalVisible] = useState(false);
 	const [editing, setEditing] = useState<Transaction | null>(null);
 	const [form, setForm] = useState<
@@ -311,11 +311,10 @@ export default function TransactionsScreen() {
 				amount: valorFloat,
 				notes: form.notes || undefined,
 				is_recurring: form.is_recurring || false,
-			};
-			if (editing?.id) {
+			};			if (editing?.id) {
 				await edit(editing.id, payload);
 			} else {
-				await edit("", payload); // addTransacao também pode ser chamado via edit('')
+				await add(payload);
 			}
 			setModalVisible(false);
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -324,23 +323,32 @@ export default function TransactionsScreen() {
 		}
 		setSaving(false);
 	};
-
 	const handleDelete = (id: string, type: "income" | "expense") => {
-		Alert.alert("Excluir", "Deseja realmente excluir esta transação?", [
-			{ text: "Cancelar", style: "cancel" },
-			{
-				text: "Excluir",
-				style: "destructive",
-				onPress: async () => {
-					try {
-						await remove(id, type);
-					// eslint-disable-next-line @typescript-eslint/no-unused-vars
-					} catch (e) {
-						Alert.alert("Erro", "Não foi possível excluir.");
-					}
+		if (!id) {
+			Alert.alert("Erro", "ID da transação inválido.");
+			return;
+		}
+
+		Alert.alert(
+			"Excluir transação",
+			"Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.",
+			[
+				{ text: "Cancelar", style: "cancel" },
+				{
+					text: "Excluir",
+					style: "destructive",
+					onPress: async () => {
+						try {
+							await remove(id, type);
+							Alert.alert("Sucesso", "Transação excluída com sucesso!");
+						} catch (e) {
+							const errorMessage = e instanceof Error ? e.message : "Não foi possível excluir a transação.";
+							Alert.alert("Erro", errorMessage);
+						}
+					},
 				},
-			},
-		]);
+			]
+		);
 	};
 
 	const renderTransaction = ({ item }: { item: Transaction }) => (
