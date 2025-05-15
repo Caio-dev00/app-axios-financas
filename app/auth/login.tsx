@@ -1,74 +1,82 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Colors } from '@/constants/Colors';
-import axios from 'axios';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { Redirect, router } from 'expo-router';
 import React, { useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-
-const supabaseUrl = 'https://yascliotrmqhvqbvrhsc.supabase.co';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import supabaseClient from '../lib/supabase';
 
 export default function LoginScreen() {
+  const { user, isLoading, signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [resetEmail, setResetEmail] = useState('');
   const [resetting, setResetting] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showReset, setShowReset] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Redireciona para o app se já estiver autenticado
+  if (!isLoading && user) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  const validateForm = () => {
+    if (!email.trim()) return 'Digite seu email';
+    if (!password.trim()) return 'Digite sua senha';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) return 'Email inválido';
+    return null;
+  };
 
   const handleLogin = async () => {
+    if (loading) return;
+    
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const { data } = await axios.post(
-        `${supabaseUrl}/auth/v1/token?grant_type=password`,
-        {
-          email,
-          password,
-        },
-        {
-          headers: {
-            apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc2NsaW90cm1xaHZxYnZyaHNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5NTA3NjksImV4cCI6MjA2MTUyNjc2OX0.Yh2Ebi1n6CPx2mVERHfA7G5w_kaF6_p7OImAF3qRj8o',
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      if (data && data.access_token) {
-        await SecureStore.setItemAsync('supabase_token', data.access_token);
-        router.replace('/(tabs)');
-      } else {
-        alert('Email ou senha inválidos.');
+      setError(null);
+      setLoading(true);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      const validationError = validateForm();
+      if (validationError) {
+        throw new Error(validationError);
       }
+      
+      await signIn(email.trim(), password.trim());
+      // O redirecionamento será feito pelo AuthContext após login bem-sucedido
     } catch (error) {
-      alert('Erro ao fazer login. Verifique suas credenciais.');
-      console.error(error);
+      console.error('Erro no login:', error);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      setError(error instanceof Error ? error.message : 'Erro ao fazer login');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handlePasswordReset = async () => {
-    if (!resetEmail) {
-      alert('Informe o email.');
+    if (!resetEmail.trim()) {
+      setError('Informe o email.');
       return;
     }
+
     setResetting(true);
+    setError(null);
+
     try {
-      await axios.post(
-        `${supabaseUrl}/auth/v1/recover`,
-        { email: resetEmail },
-        {
-          headers: {
-            apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc2NsaW90cm1xaHZxYnZyaHNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5NTA3NjksImV4cCI6MjA2MTUyNjc2OX0.Yh2Ebi1n6CPx2mVERHfA7G5w_kaF6_p7OImAF3qRj8o',
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      await supabaseClient.post('/auth/v1/recover', { 
+        email: resetEmail.trim(),
+      });
       alert('Se o email estiver cadastrado, você receberá um link para redefinir a senha.');
       setShowReset(false);
       setResetEmail('');
-    } catch (e) {
-      alert('Erro ao solicitar recuperação.');
+    } catch (error) {
+      console.error('Erro na recuperação:', error);
+      setError('Erro ao solicitar recuperação de senha.');
+    } finally {
+      setResetting(false);
     }
-    setResetting(false);
   };
 
   return (
@@ -91,6 +99,7 @@ export default function LoginScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={!loading}
           />
           <TextInput
             style={styles.input}
@@ -98,49 +107,85 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            editable={!loading}
           />
-
+          {error && (
+            <ThemedText style={styles.errorText}>
+              {error}
+            </ThemedText>
+          )}
           <TouchableOpacity 
-            style={styles.button}
+            style={[styles.button, loading && { opacity: 0.7 }]}
             onPress={handleLogin}
+            disabled={loading}
           >
-            <ThemedText style={styles.buttonText}>Entrar</ThemedText>
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <ThemedText style={styles.buttonText}>
+                Entrar
+              </ThemedText>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={styles.registerButton}
             onPress={() => router.push('/auth/register')}
+            disabled={loading}
           >
             <ThemedText style={styles.registerText}>
               Não tem uma conta? Cadastre-se
             </ThemedText>
           </TouchableOpacity>
 
-          <Modal visible={showReset} animationType="slide" transparent>
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'center', alignItems: 'center' }}>
-              <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 20, width: '90%' }}>
-                <ThemedText style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Recuperar senha</ThemedText>
-                <TextInput
-                  style={{ backgroundColor: '#f5f5f5', padding: 12, borderRadius: 8, marginBottom: 12 }}
-                  placeholder="Email"
-                  value={resetEmail}
-                  onChangeText={setResetEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity onPress={handlePasswordReset} style={{ backgroundColor: Colors.light.tint, borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 8 }} disabled={resetting}>
-                  <ThemedText style={{ color: '#fff', fontWeight: 'bold' }}>{resetting ? 'Enviando...' : 'Enviar link'}</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowReset(false)} style={{ alignItems: 'center' }}>
-                  <ThemedText style={{ color: Colors.light.error }}>Cancelar</ThemedText>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
-          <TouchableOpacity style={{ alignItems: 'center', marginTop: 8 }} onPress={() => setShowReset(true)}>
-            <ThemedText style={{ color: Colors.light.tint, fontSize: 14 }}>Esqueci minha senha</ThemedText>
+          <TouchableOpacity 
+            style={{ alignItems: 'center', marginTop: 8 }} 
+            onPress={() => setShowReset(true)}
+            disabled={loading}
+          >
+            <ThemedText style={{ color: Colors.light.tint, fontSize: 14 }}>
+              Esqueci minha senha
+            </ThemedText>
           </TouchableOpacity>
         </View>
+
+        <Modal visible={showReset} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <ThemedText style={styles.modalTitle}>Recuperar senha</ThemedText>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Email"
+                value={resetEmail}
+                onChangeText={setResetEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              {error && (
+                <ThemedText style={styles.errorText}>
+                  {error}
+                </ThemedText>
+              )}
+              <TouchableOpacity 
+                onPress={handlePasswordReset} 
+                style={[styles.modalButton, { backgroundColor: Colors.light.tint }]} 
+                disabled={resetting}
+              >
+                <ThemedText style={styles.modalButtonText}>
+                  {resetting ? 'Enviando...' : 'Enviar link'}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => setShowReset(false)} 
+                style={styles.modalCancelButton}
+              >
+                <ThemedText style={{ color: Colors.light.error }}>
+                  Cancelar
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </ThemedView>
     </KeyboardAvoidingView>
   );
@@ -171,16 +216,10 @@ const styles = StyleSheet.create({
     color: Colors.light.tint,
     marginBottom: 8,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
     opacity: 0.7,
   },
   form: {
@@ -197,7 +236,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 8,
   },
   buttonText: {
     color: '#fff',
@@ -205,11 +243,52 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   registerButton: {
-    marginTop: 16,
     alignItems: 'center',
   },
   registerText: {
     color: Colors.light.tint,
     fontSize: 14,
   },
-}); 
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  modalInput: {
+    backgroundColor: '#f5f5f5',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  modalButton: {
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  modalCancelButton: {
+    alignItems: 'center',
+  },
+  errorText: {
+    color: Colors.light.error,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+});

@@ -1,29 +1,31 @@
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/components/ThemedView';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs, router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import { useEffect, useState } from 'react';
+import { Redirect, Tabs } from 'expo-router';
+import { ActivityIndicator } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 import { TransactionsProvider } from '../TransactionsContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const [isAuth, setIsAuth] = useState<boolean | null>(null);
+  const { user, isLoading } = useAuth();
 
-  useEffect(() => {
-    async function checkAuth() {
-      const token = await SecureStore.getItemAsync('supabase_token');
-      if (!token) {
-        setIsAuth(false);
-        router.replace('/auth/login');
-      } else {
-        setIsAuth(true);
-      }
-    }
-    checkAuth();
-  }, []);
+  // Mostra tela de carregamento enquanto verifica autenticação
+  if (isLoading) {
+    return (
+      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
+        <ThemedText style={{ marginTop: 10 }}>Verificando autenticação...</ThemedText>
+      </ThemedView>
+    );
+  }
 
-  if (isAuth === false) return null;
+  // Redireciona para login se não estiver autenticado
+  if (!user) {
+    return <Redirect href="/auth/login" />;
+  }
 
   return (
     <TransactionsProvider>

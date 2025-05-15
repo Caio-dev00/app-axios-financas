@@ -1,94 +1,105 @@
 import { ThemedText } from '@/components/ThemedText';
 import { Colors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getProfile, getUser, updateProfile } from '../supabaseClient';
-
-interface UserProfile {
-  id: string;
-  email: string;
-  full_name: string;
-  avatar_url: string;
-  is_pro: boolean;
-  telefone?: string;
-  phone?: string;
-}
+import { useAuth } from '../contexts/AuthContext';
+import { getProfile, getSubscription, updateProfile, type UserProfile } from '../supabaseClient';
 
 export default function ProfileScreen() {
+  const { user: authUser, signOut, validateSession } = useAuth();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = Colors[isDark ? 'dark' : 'light'];
 
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isPro, setIsPro] = useState(false);
-  const [fullName, setFullName] = useState<string>('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
     nome: '',
     phone: '',
-    email: '',
+  });
+  const [subscription, setSubscription] = useState<{
+    isPro: boolean;
+    daysLeft: number | null;
+  }>({
+    isPro: false,
+    daysLeft: null
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  useEffect(() => {
-    fetchUserProfile();
-  }, []);
-
-  const fetchUserProfile = async () => {
+  const checkAuth = useCallback(async () => {
     try {
-      const authUser = await getUser();
-      if (!authUser) {
-        router.replace('/auth/login');
+      const token = await SecureStore.getItemAsync('supabase_token');
+      if (!token) {
+        console.error('No token found');
+        throw new Error('Usuário não autenticado');
+      }
+      
+      const isValid = await validateSession();
+      if (!isValid) {
+        throw new Error('Sessão inválida');
+      }
+      return true;
+    } catch (error: any) {
+      console.error('Auth check failed:', error.message);
+      await signOut();
+      router.replace('/auth/login');
+      return false;
+    }
+  }, [validateSession, signOut]);
+
+  const fetchUserData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setFormError(null);
+
+      const isAuthenticated = await checkAuth();
+      if (!isAuthenticated) {
         return;
       }
 
-      const profile = await getProfile();
-      if (profile) {
-        setFullName(profile.nome || '');
-        setEditForm({
-          nome: profile.nome || '',
-          phone: profile.phone || '',
-          email: authUser.email || '',
-        });
+      const [profileData, subscriptionData] = await Promise.all([
+        getProfile(),
+        getSubscription()
+      ]);
+
+      if (!profileData) {
+        throw new Error('Perfil não encontrado');
       }
 
-      setUser({
-        id: authUser.id,
-        email: authUser.email || '',
-        full_name: authUser.user_metadata?.full_name || '',
-        avatar_url: authUser.user_metadata?.avatar_url || '',
-        is_pro: false,
-        telefone: profile?.telefone,
-        phone: profile?.phone,
+      setProfile(profileData);
+      setSubscription(subscriptionData);
+      setEditForm({
+        nome: profileData.nome || '',
+        phone: profileData.phone || '',
       });
-
-      const token = await SecureStore.getItemAsync('supabase_token');
-      const supabaseUrl = 'https://yascliotrmqhvqbvrhsc.supabase.co';
-      const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc2NsaW90cm1xaHZxYnZyaHNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5NTA3NjksImV4cCI6MjA2MTUyNjc2OX0.Yh2Ebi1n6CPx2mVERHfA7G5w_kaF6_p7OImAF3qRj8o';
-      const { data } = await axios.get(`${supabaseUrl}/rest/v1/user_subscriptions?user_id=eq.${authUser.id}&plan_type=eq.pro&is_active=eq.true`, {
-        headers: {
-          apikey: supabaseAnonKey,
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      setIsPro(Array.isArray(data) && data.length > 0);
-    } catch (error) {
-      console.error('Error fetching user profile or subscription:', error);
+    } catch (error: any) {
+      console.error('Failed to fetch user data:', error.message);
+      setFormError(error.message);
+      if (retryCount < 3) {
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          fetchUserData();
+        }, 1000 * (retryCount + 1));
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [checkAuth, retryCount]);
+
+  useEffect(() => {
+    fetchUserData();
+  }, [fetchUserData]);
 
   const handleLogout = async () => {
     try {
-      await SecureStore.deleteItemAsync('supabase_token');
+      await signOut();
       router.replace('/auth/login');
     } catch (error) {
       console.error('Error logging out:', error);
@@ -96,34 +107,28 @@ export default function ProfileScreen() {
   };
 
   const handleEditProfile = async () => {
-    setFormError(null);
-    console.log('=== [DEBUG] handleEditProfile ===');
-    console.log('Payload a ser enviado:', { nome: editForm.nome, phone: editForm.phone });
-    if (!editForm.nome.trim()) {
-      setFormError('Nome é obrigatório');
-      return;
-    }
-
-    setSaving(true);
     try {
-      // Logar valor atual do banco antes do update
-      const before = await getProfile();
-      console.log('Valor atual no banco:', before);
+      setSaving(true);
+      setFormError(null);
+
+      const isAuthenticated = await checkAuth();
+      if (!isAuthenticated) return;
+
+      if (!editForm.nome.trim()) {
+        setFormError('Nome é obrigatório');
+        return;
+      }
 
       await updateProfile({
-        nome: editForm.nome,
-        phone: editForm.phone,
+        nome: editForm.nome.trim(),
+        phone: editForm.phone.trim(),
       });
 
-      // Logar valor do banco após o update
-      const after = await getProfile();
-      console.log('Valor após update:', after);
-
-      setFullName(editForm.nome);
+      await fetchUserData();
       setShowEditModal(false);
     } catch (error) {
       console.error('Error updating profile:', error);
-      setFormError('Erro ao atualizar perfil. Tente novamente.');
+      setFormError(error instanceof Error ? error.message : 'Erro ao atualizar perfil');
     } finally {
       setSaving(false);
     }
@@ -131,129 +136,80 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom', 'left', 'right']}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.tint} />
+          <ThemedText style={styles.loadingText}>Carregando perfil...</ThemedText>
         </View>
       </SafeAreaView>
     );
   }
 
+  if (!authUser) {
+    return null;
+  }
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Header */}
-          <View style={[styles.header, { backgroundColor: theme.card }]}>
-            <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
-              <Image
-                source={{ uri: user?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName || 'Usuário')}&background=19C37D&color=fff&size=128` }}
-                style={styles.avatar}
-              />
-              {isPro ? (
-                <View style={{ position: 'absolute', bottom: 8, right: 8, backgroundColor: theme.tint, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', elevation: 2 }}>
-                  <ThemedText style={{ color: '#fff', fontWeight: 'bold', marginRight: 4, fontSize: 13 }}>PRO</ThemedText>
-                  <Ionicons name="star" size={16} color="#fff" />
-                </View>
-              ) : (
-                <View style={{ position: 'absolute', bottom: 8, right: 8, backgroundColor: '#888', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', elevation: 2 }}>
-                  <ThemedText style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>Free</ThemedText>
-                </View>
-              )}
-            </View>
-            <ThemedText style={[styles.name, { color: theme.text }]}>{fullName || 'Usuário'}</ThemedText>
-            <ThemedText style={[styles.email, { color: theme.gray }]}>{editForm.email}</ThemedText>
-            {editForm.phone && (
-              <ThemedText style={[styles.phone, { color: theme.gray }]}>{editForm.phone}</ThemedText>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <View style={styles.avatarContainer}>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatarPlaceholder, { backgroundColor: theme.tint }]}>
+                <Ionicons name="person" size={40} color="#fff" />
+              </View>
             )}
           </View>
 
-          {/* Menu Items */}
-          <View style={styles.menuSection}>
-            <TouchableOpacity 
-              style={[styles.menuItem, { backgroundColor: theme.card }]}
-              onPress={() => setShowEditModal(true)}
-            >
-              <Ionicons name="person-outline" size={24} color={theme.tint} />
-              <ThemedText style={[styles.menuText, { color: theme.text }]}>Editar Perfil</ThemedText>
-              <Ionicons name="chevron-forward" size={24} color={theme.gray} />
-            </TouchableOpacity>
+          <ThemedText style={styles.name}>{profile?.nome || 'Usuário'}</ThemedText>
+          <ThemedText style={styles.email}>{authUser.email}</ThemedText>
+        </View>
 
-            <TouchableOpacity style={[styles.menuItem, { backgroundColor: theme.card }]}>
-              <Ionicons name="notifications-outline" size={24} color={theme.tint} />
-              <ThemedText style={[styles.menuText, { color: theme.text }]}>Notificações</ThemedText>
-              <Ionicons name="chevron-forward" size={24} color={theme.gray} />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.menuItem, { backgroundColor: theme.card }]}>
-              <Ionicons name="lock-closed-outline" size={24} color={theme.tint} />
-              <ThemedText style={[styles.menuText, { color: theme.text }]}>Segurança</ThemedText>
-              <Ionicons name="chevron-forward" size={24} color={theme.gray} />
-            </TouchableOpacity>
+        <View style={styles.infoSection}>
+          <View style={styles.infoRow}>
+            <ThemedText style={styles.infoLabel}>Tipo de Conta</ThemedText>
+            <ThemedText style={[styles.infoValue, subscription.isPro && { color: theme.tint, fontWeight: 'bold' }]}>
+              {subscription.isPro ? 'PRO' : 'Free'}
+            </ThemedText>
           </View>
-
-          {/* PRO Card - Only show if user is not PRO */}
-          {!isPro && (
-            <View style={[styles.proCard, { backgroundColor: theme.tint }]}>
-              <Ionicons name="star" size={32} color="#fff" />
-              <ThemedText style={styles.proTitle}>Desbloqueie Recursos Exclusivos</ThemedText>
-              <ThemedText style={styles.proDescription}>
-                Assine o plano PRO e tenha acesso a recursos avançados de gestão financeira
-              </ThemedText>
-              <TouchableOpacity 
-                style={styles.proButton}
-                onPress={() => Linking.openURL('https://pay.cakto.com.br/3bnjhuj_366904')}
-              >
-                <ThemedText style={styles.proButtonText}>Assinar Agora</ThemedText>
-              </TouchableOpacity>
+          {subscription.isPro && subscription.daysLeft !== null && (
+            <View style={styles.infoRow}>
+              <ThemedText style={styles.infoLabel}>Dias Restantes</ThemedText>
+              <ThemedText style={[styles.infoValue, { color: theme.tint }]}>{subscription.daysLeft}</ThemedText>
             </View>
           )}
+          <View style={styles.infoRow}>
+            <ThemedText style={styles.infoLabel}>Telefone</ThemedText>
+            <ThemedText style={styles.infoValue}>{profile?.phone || 'Não informado'}</ThemedText>
+          </View>
+        </View>
 
-          {/* Logout Button */}
-          <TouchableOpacity 
-            style={[styles.logoutButton, { backgroundColor: theme.error }]} 
-            onPress={handleLogout}
-          >
-            <ThemedText style={styles.logoutText}>Sair</ThemedText>
-          </TouchableOpacity>
-        </ScrollView>
-
-        {/* Modal de Edição de Perfil */}
-        <Modal
-          visible={showEditModal}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setShowEditModal(false)}
+        <TouchableOpacity
+          style={[styles.editButton, { backgroundColor: theme.tint }]}
+          onPress={() => {
+            setEditForm({
+              nome: profile?.nome || '',
+              phone: profile?.phone || '',
+            });
+            setShowEditModal(true);
+          }}
         >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+          <ThemedText style={styles.editButtonText}>Editar Perfil</ThemedText>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.logoutButton, { backgroundColor: theme.error }]}
+          onPress={handleLogout}
+        >
+          <ThemedText style={styles.logoutButtonText}>Sair</ThemedText>
+        </TouchableOpacity>
+
+        {showEditModal && (
+          <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+            <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
               <ThemedText style={[styles.modalTitle, { color: theme.text }]}>Editar Perfil</ThemedText>
-              
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.background, color: theme.text }]}
-                placeholder="Nome completo"
-                placeholderTextColor={theme.gray}
-                value={editForm.nome}
-                onChangeText={(text) => setEditForm(prev => ({ ...prev, nome: text }))}
-                maxLength={25}
-              />
-
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.background, color: theme.text }]}
-                placeholder="Telefone (opcional)"
-                placeholderTextColor={theme.gray}
-                value={editForm.phone}
-                onChangeText={(text) => setEditForm(prev => ({ ...prev, phone: text }))}
-                keyboardType="phone-pad"
-              />
-
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.background, color: theme.text }]}
-                placeholder="E-mail"
-                placeholderTextColor={theme.gray}
-                value={editForm.email}
-                editable={false}
-              />
 
               {formError && (
                 <ThemedText style={[styles.errorText, { color: theme.error }]}>
@@ -261,30 +217,50 @@ export default function ProfileScreen() {
                 </ThemedText>
               )}
 
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.card, color: theme.text }]}
+                placeholder="Nome"
+                value={editForm.nome}
+                onChangeText={(text) => setEditForm((prev) => ({ ...prev, nome: text }))}
+                placeholderTextColor={theme.gray}
+                editable={!saving}
+              />
+
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.card, color: theme.text }]}
+                placeholder="Telefone"
+                value={editForm.phone}
+                onChangeText={(text) => setEditForm((prev) => ({ ...prev, phone: text }))}
+                placeholderTextColor={theme.gray}
+                keyboardType="phone-pad"
+                editable={!saving}
+              />
+
               <View style={styles.modalButtons}>
                 <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: theme.gray }]}
+                  style={[styles.modalButton, styles.cancelButton]}
                   onPress={() => setShowEditModal(false)}
+                  disabled={saving}
                 >
-                  <ThemedText style={styles.modalButtonText}>Cancelar</ThemedText>
+                  <ThemedText style={[styles.modalButtonText, { color: theme.error }]}>Cancelar</ThemedText>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: theme.tint }]}
+                  style={[styles.modalButton, styles.saveButton, { backgroundColor: theme.tint }]}
                   onPress={handleEditProfile}
                   disabled={saving}
                 >
                   {saving ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <ThemedText style={styles.modalButtonText}>Salvar</ThemedText>
+                    <ThemedText style={[styles.modalButtonText, { color: '#fff' }]}>Salvar</ThemedText>
                   )}
                 </TouchableOpacity>
               </View>
             </View>
           </View>
-        </Modal>
-      </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -294,130 +270,132 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    flexGrow: 1,
     padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
   },
   header: {
     alignItems: 'center',
-    padding: 24,
-    borderRadius: 16,
-    marginBottom: 24,
+    marginBottom: 30,
+  },
+  avatarContainer: {
+    marginBottom: 15,
   },
   avatar: {
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-    marginBottom: 16,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  avatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   email: {
     fontSize: 16,
-    marginBottom: 2,
+    opacity: 0.7,
   },
-  phone: {
-    fontSize: 16,
+  infoSection: {
+    marginBottom: 30,
   },
-  menuSection: {
-    gap: 12,
-    marginBottom: 24,
-  },
-  menuItem: {
+  infoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-  },
-  menuText: {
-    flex: 1,
-    fontSize: 16,
-    marginLeft: 12,
-  },
-  proCard: {
-    padding: 24,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  proTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  proDescription: {
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  proButton: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 24,
+    justifyContent: 'space-between',
     paddingVertical: 12,
-    borderRadius: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
-  proButtonText: {
-    color: '#000',
-    fontWeight: 'bold',
+  infoLabel: {
+    fontSize: 16,
+  },
+  infoValue: {
+    fontSize: 16,
+    opacity: 0.7,
+  },
+  editButton: {
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  editButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   logoutButton: {
-    padding: 16,
-    borderRadius: 12,
+    padding: 15,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  logoutText: {
+  logoutButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  modalContainer: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
-    alignItems: 'center',
+    padding: 20,
   },
   modalContent: {
-    width: '90%',
-    maxWidth: 400,
-    borderRadius: 16,
-    padding: 24,
+    padding: 20,
+    borderRadius: 8,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 20,
+  },
+  errorText: {
+    marginBottom: 15,
     textAlign: 'center',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
     padding: 12,
-    marginBottom: 16,
+    borderRadius: 8,
+    marginBottom: 15,
     fontSize: 16,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
   },
   modalButton: {
     flex: 1,
-    padding: 14,
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginHorizontal: 4,
+  },
+  cancelButton: {
+    marginRight: 10,
+    backgroundColor: 'transparent',
+  },
+  saveButton: {
+    marginLeft: 10,
   },
   modalButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
     fontSize: 16,
+    fontWeight: '600',
   },
-  errorText: {
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-}); 
+});

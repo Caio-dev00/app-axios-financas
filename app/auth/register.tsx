@@ -1,120 +1,128 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Colors } from '@/constants/Colors';
-import axios from 'axios';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { Redirect, router } from 'expo-router';
 import React, { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-
-const supabaseUrl = 'https://yascliotrmqhvqbvrhsc.supabase.co';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function RegisterScreen() {
-  const [name, setName] = useState('');
+  const { user, isLoading, signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Redireciona para o app se já estiver autenticado
+  if (!isLoading && user) {
+    return <Redirect href="/(tabs)" />;
+  }
 
   const handleRegister = async () => {
-    if (!name || !email || !password || !confirmPassword) {
-      alert('Preencha todos os campos.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      alert('As senhas não coincidem.');
-      return;
-    }
+    if (loading) return;
+
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const { data } = await axios.post(
-        `${supabaseUrl}/auth/v1/signup`,
-        {
-          email,
-          password,
-          options: { data: { name } },
-        },
-        {
-          headers: {
-            apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc2NsaW90cm1xaHZxYnZyaHNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5NTA3NjksImV4cCI6MjA2MTUyNjc2OX0.Yh2Ebi1n6CPx2mVERHfA7G5w_kaF6_p7OImAF3qRj8o',
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      if (data?.access_token) {
-        await SecureStore.setItemAsync('supabase_token', data.access_token);
-        router.replace('/(tabs)');
-      } else {
-        alert('Erro ao cadastrar. Tente novamente.');
+      setError(null);
+      setLoading(true);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      // Validações
+      if (!email.trim() || !password.trim() || !confirmPassword.trim()) {
+        throw new Error('Por favor, preencha todos os campos');
       }
+
+      if (password !== confirmPassword) {
+        throw new Error('As senhas não coincidem');
+      }
+
+      if (password.length < 6) {
+        throw new Error('A senha deve ter pelo menos 6 caracteres');
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new Error('Email inválido');
+      }
+
+      // Cadastrar
+      await signUp(email.trim(), password.trim());
+      // O redirecionamento será feito automaticamente pelo AuthContext
+      
     } catch (error) {
-      alert('Erro ao cadastrar. Verifique os dados.');
-      console.error(error);
+      console.error('Erro no registro:', error);
+      setError(error instanceof Error ? error.message : 'Erro ao criar conta.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <ThemedView style={styles.content}>
-          <View style={styles.logoContainer}>
-            <Image source={require('@/assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-            <ThemedText style={styles.brand}>Axios Finanças</ThemedText>
-          </View>
-          <ThemedText style={styles.subtitle}>Comece a gerenciar suas finanças</ThemedText>
+      <ThemedView style={styles.content}>
+        <View style={styles.logoContainer}>
+          <Image source={require('@/assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+          <ThemedText style={styles.brand}>Axios Finanças</ThemedText>
+        </View>
+        
+        <ThemedText style={styles.subtitle}>Crie sua conta para começar</ThemedText>
 
-          <View style={styles.form}>
-            <TextInput
-              style={styles.input}
-              placeholder="Nome completo"
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Senha"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Confirmar senha"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-            />
+        {error && (
+          <ThemedText style={styles.errorText}>{error}</ThemedText>
+        )}
 
-            <TouchableOpacity 
-              style={styles.button}
-              onPress={handleRegister}
-            >
-              <ThemedText style={styles.buttonText}>Cadastrar</ThemedText>
-            </TouchableOpacity>
+        <View style={styles.form}>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            editable={!loading}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Senha"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            editable={!loading}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Confirme a senha"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            editable={!loading}
+          />
+          
+          <TouchableOpacity 
+            style={[styles.button, loading && { opacity: 0.7 }]}
+            onPress={handleRegister}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <ThemedText style={styles.buttonText}>Criar conta</ThemedText>
+            )}
+          </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.loginButton}
-              onPress={() => router.push('/auth/login')}
-            >
-              <ThemedText style={styles.loginText}>
-                Já tem uma conta? Faça login
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
-        </ThemedView>
-      </ScrollView>
+          <TouchableOpacity 
+            style={styles.linkButton}
+            onPress={() => router.back()}
+            disabled={loading}
+          >
+            <ThemedText style={styles.linkText}>Já tem uma conta? Entrar</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </ThemedView>
     </KeyboardAvoidingView>
   );
 }
@@ -122,10 +130,6 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
   },
   content: {
     flex: 1,
@@ -134,58 +138,55 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 30,
   },
   logo: {
-    width: 80,
-    height: 80,
-    marginBottom: 8,
-  },
-  brand: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.light.tint,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    width: 100,
+    height: 100,
     marginBottom: 10,
   },
+  brand: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
   subtitle: {
-    fontSize: 16,
     textAlign: 'center',
-    marginBottom: 40,
-    opacity: 0.7,
+    marginBottom: 30,
+    fontSize: 16,
+  },
+  errorText: {
+    color: Colors.light.error,
+    textAlign: 'center',
+    marginBottom: 15,
   },
   form: {
-    gap: 16,
+    width: '100%',
   },
   input: {
-    backgroundColor: '#f5f5f5',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 15,
     fontSize: 16,
   },
   button: {
     backgroundColor: Colors.light.tint,
-    padding: 16,
-    borderRadius: 12,
+    padding: 15,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 5,
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  loginButton: {
-    marginTop: 16,
-    alignItems: 'center',
+  linkButton: {
+    marginTop: 15,
+    padding: 10,
   },
-  loginText: {
-    color: Colors.light.tint,
+  linkText: {
+    textAlign: 'center',
     fontSize: 14,
   },
-}); 
+});

@@ -1,27 +1,15 @@
-import { ThemedText } from "@/components/ThemedText";
-import { Colors } from "@/constants/Colors";
-import { Ionicons } from "@expo/vector-icons";
-import Feather from '@expo/vector-icons/Feather';
+import { ThemedText } from '@/components/ThemedText';
+import { Colors } from '@/constants/Colors';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Picker } from "@react-native-picker/picker";
-import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
-import React, { useEffect, useState } from "react";
-import {
-	ActivityIndicator,
-	Linking,
-	Modal,
-	ScrollView,
-	StatusBar,
-	StyleSheet,
-	TextInput,
-	TouchableOpacity,
-	View,
-	useColorScheme
-} from "react-native";
+import { Picker } from '@react-native-picker/picker';
+import * as Linking from 'expo-linking';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTransactions } from '../TransactionsContext';
-import { getUser } from '../supabaseClient';
+import { getProfile, getSubscription } from '../supabaseClient';
 
 const CATEGORIAS_PADRAO = [
 	{ label: "Alimentação", value: "Alimentação" },
@@ -43,6 +31,11 @@ export default function DashboardScreen() {
 	const { transactions, loading, add } = useTransactions();
 	const [fabMenuVisible, setFabMenuVisible] = useState(false);
 	const [modalVisible, setModalVisible] = useState(false);
+	const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+	const [daysActive, setDaysActive] = useState<number | null>(null);
+	const [userName, setUserName] = useState<string>('');
+	const [isPro, setIsPro] = useState(false);
+	const [daysLeft, setDaysLeft] = useState<number | null>(null);
 	const [form, setForm] = useState<{
 		title: string;
 		amount: number;
@@ -65,72 +58,39 @@ export default function DashboardScreen() {
 			is_recurring: false,
 		}
 	);
+	const [showDatePicker, setShowDatePicker] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
-	const [showDatePicker, setShowDatePicker] = useState(false);
-	const [userName, setUserName] = useState<string>('');
-	const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-	const [isPro, setIsPro] = useState(false);
-	const [daysLeft, setDaysLeft] = useState<number | null>(null);
 
 	useEffect(() => {
-		async function fetchUserName() {
+		async function loadUserData() {
 			try {
-				const user = await getUser();
-				if (user?.id) {
-					const supabaseUrl = 'https://yascliotrmqhvqbvrhsc.supabase.co';
-					const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc2NsaW90cm1xaHZxYnZyaHNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5NTA3NjksImV4cCI6MjA2MTUyNjc2OX0.Yh2Ebi1n6CPx2mVERHfA7G5w_kaF6_p7OImAF3qRj8o';
-					const token = await SecureStore.getItemAsync('supabase_token');
-					const { data } = await axios.get(`${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}`, {
-						headers: {
-							apikey: supabaseAnonKey,
-							Authorization: `Bearer ${token}`,
-						},
-					});
-					if (Array.isArray(data) && data[0]?.nome) {
-						const firstName = data[0].nome.split(' ')[0];
-						setUserName(firstName);
-					}
-				}
-			} catch {}
-		}
-		fetchUserName();
-	}, []);
+				const [profile, subscription] = await Promise.all([
+					getProfile(),
+					getSubscription()
+				]);
 
-	// Buscar status da assinatura
-	useEffect(() => {
-		async function fetchSubscription() {
-			try {
-				const user = await getUser();
-				if (user?.id) {
-					const supabaseUrl = 'https://yascliotrmqhvqbvrhsc.supabase.co';
-					const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc2NsaW90cm1xaHZxYnZyaHNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5NTA3NjksImV4cCI6MjA2MTUyNjc2OX0.Yh2Ebi1n6CPx2mVERHfA7G5w_kaF6_p7OImAF3qRj8o';
-					const token = await SecureStore.getItemAsync('supabase_token');
-					const { data } = await axios.get(`${supabaseUrl}/rest/v1/user_subscriptions?user_id=eq.${user.id}&is_active=eq.true`, {
-						headers: {
-							apikey: supabaseAnonKey,
-							Authorization: `Bearer ${token}`,
-						},
-					});
-					if (Array.isArray(data) && data.length > 0 && data[0].plan_type === 'pro') {
-						setIsPro(true);
-						if (data[0].expires_at) {
-							const expires = new Date(data[0].expires_at);
-							const now = new Date();
-							const diff = Math.ceil((expires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-							setDaysLeft(diff > 0 ? diff : 0);
-						}
-					} else {
-						setIsPro(false);
-						setDaysLeft(null);
-					}
+				if (profile?.nome) {
+					const firstName = profile.nome.split(' ')[0];
+					setUserName(firstName);
 				}
-			} catch {
-				setIsPro(false);
-				setDaysLeft(null);
+
+				setIsPro(subscription.isPro);
+				setDaysLeft(subscription.daysLeft);
+
+				if (profile?.created_at) {
+					const createdAt = new Date(profile.created_at);
+					const now = new Date();
+					const diffTime = Math.abs(now.getTime() - createdAt.getTime());
+					const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+					setDaysActive(diffDays);
+				}
+			} catch (error) {
+				console.error('Error loading user data:', error);
 			}
 		}
-		fetchSubscription();
+
+		loadUserData();
 	}, []);
 
 	const openAddModal = (type: "income" | "expense") => {
@@ -205,29 +165,22 @@ export default function DashboardScreen() {
 
 	return (
 		<SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom', 'left', 'right']}>
-			<StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.tint} />
+			<StatusBar style={isDark ? "light" : "dark"} backgroundColor={theme.tint} />
 			<View style={[styles.container, { backgroundColor: theme.background }]}>
 				{/* Top Bar */}
 				<View style={styles.topBar}>
-					<ThemedText style={[styles.topBarTitle, { color: theme.text }]}>Bem-vindo{userName ? `, ${userName}` : ''}</ThemedText>
+					<ThemedText style={[styles.topBarTitle, { color: theme.text }]}>
+						Bem-vindo{userName ? `, ${userName}` : ''}
+					</ThemedText>
 					<View style={styles.topBarIcons}>
 						<TouchableOpacity style={styles.topBarIconBtn}>
-							<Ionicons
-								name="notifications-outline"
-								size={22}
-								color={theme.tint}
-							/>
-							<View
-								style={[
-									styles.notificationBadge,
-									{ backgroundColor: theme.tint },
-								]}
-							>
+							<Ionicons name="notifications-outline" size={22} color={theme.tint} />
+							<View style={[styles.notificationBadge, { backgroundColor: theme.tint }]}>
 								<ThemedText style={styles.badgeText}>1</ThemedText>
 							</View>
 						</TouchableOpacity>
 						<TouchableOpacity style={styles.topBarIconBtn} onPress={() => setShowSubscriptionModal(true)}>
-							<Ionicons name="settings-outline" size={22} color={theme.tint} />
+							<Ionicons name={isPro ? "star" : "settings-outline"} size={22} color={theme.tint} />
 						</TouchableOpacity>
 					</View>
 				</View>
@@ -594,36 +547,63 @@ export default function DashboardScreen() {
 						</View>
 					</View>
 				</Modal>
+				{/* Modal de Configurações */}
 				<Modal visible={showSubscriptionModal} animationType="slide" transparent>
 					<View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', alignItems: 'center' }}>
-						<View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 28, width: '92%', maxWidth: 400, alignItems: 'center', shadowColor: theme.tint, shadowOpacity: 0.10, shadowRadius: 16, elevation: 8 }}>
-							<ThemedText style={{ fontSize: 22, fontWeight: 'bold', color: theme.text, marginBottom: 12 }}>Gerenciar Assinatura</ThemedText>
+						<View style={{ backgroundColor: theme.background, borderRadius: 20, padding: 28, width: '92%', maxWidth: 400, alignItems: 'center', shadowColor: theme.tint, shadowOpacity: 0.10, shadowRadius: 16, elevation: 8 }}>
+							<ThemedText style={{ fontSize: 22, fontWeight: 'bold', color: theme.text, marginBottom: 12 }}>
+								Configurações
+							</ThemedText>
+
 							<Ionicons name={isPro ? 'star' : 'star-outline'} size={38} color={isPro ? theme.tint : '#888'} style={{ marginBottom: 10 }} />
+							
 							<ThemedText style={{ fontSize: 17, color: theme.text, marginBottom: 8 }}>
 								Plano atual: <ThemedText style={{ fontWeight: 'bold', color: isPro ? theme.tint : '#888' }}>{isPro ? 'PRO' : 'Free'}</ThemedText>
 							</ThemedText>
-							{isPro && (
-								<ThemedText style={{ color: theme.text, marginBottom: 8 }}>Dias restantes: <ThemedText style={{ fontWeight: 'bold', color: theme.tint }}>{daysLeft ?? '--'}</ThemedText></ThemedText>
+							
+							{isPro && daysLeft !== null && (
+								<ThemedText style={{ color: theme.text, marginBottom: 8 }}>
+									Dias restantes: <ThemedText style={{ fontWeight: 'bold', color: theme.tint }}>{daysLeft}</ThemedText>
+								</ThemedText>
 							)}
+
+							{daysActive !== null && (
+								<ThemedText style={{ color: theme.text, marginBottom: 16, textAlign: 'center' }}>
+									Dias ativos: <ThemedText style={{ fontWeight: 'bold', color: theme.text }}>{daysActive}</ThemedText>
+								</ThemedText>
+							)}
+
 							{!isPro && (
 								<>
-									<ThemedText style={{ color: theme.text, marginBottom: 16, textAlign: 'center' }}>Desbloqueie recursos avançados e tenha uma experiência completa:</ThemedText>
+									<ThemedText style={{ color: theme.text, marginBottom: 16, textAlign: 'center' }}>
+										Desbloqueie recursos avançados e tenha uma experiência completa:
+									</ThemedText>
 									<View style={{ alignItems: 'flex-start', marginBottom: 16 }}>
 										<ThemedText style={{ color: theme.tint, fontWeight: 'bold', marginBottom: 4 }}>• Exportação de relatórios</ThemedText>
 										<ThemedText style={{ color: theme.tint, fontWeight: 'bold', marginBottom: 4 }}>• Categorias ilimitadas</ThemedText>
 										<ThemedText style={{ color: theme.tint, fontWeight: 'bold', marginBottom: 4 }}>• Suporte prioritário</ThemedText>
 										<ThemedText style={{ color: theme.tint, fontWeight: 'bold', marginBottom: 4 }}>• E muito mais!</ThemedText>
 									</View>
-									<TouchableOpacity style={{ backgroundColor: theme.tint, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 32, marginBottom: 10 }} onPress={() => Linking.openURL('https://pay.cakto.com.br/3bnjhuj_366904')}>
+									<TouchableOpacity 
+										style={{ backgroundColor: theme.tint, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 32, marginBottom: 10 }} 
+										onPress={() => Linking.openURL('https://pay.cakto.com.br/3bnjhuj_366904')}
+									>
 										<ThemedText style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Assinar PRO</ThemedText>
 									</TouchableOpacity>
 								</>
 							)}
+
 							{isPro && (
-								<ThemedText style={{ color: theme.tint, fontWeight: 'bold', marginTop: 10 }}>Obrigado por ser PRO!</ThemedText>
+								<ThemedText style={{ color: theme.tint, fontWeight: 'bold', marginTop: 10 }}>
+									Obrigado por ser PRO!
+								</ThemedText>
 							)}
-							<TouchableOpacity style={{ marginTop: 18 }} onPress={() => setShowSubscriptionModal(false)}>
-								<ThemedText style={{ color: theme.error, fontWeight: 'bold', fontSize: 15 }}>Fechar</ThemedText>
+
+							<TouchableOpacity 
+								style={{ marginTop: 18 }} 
+								onPress={() => setShowSubscriptionModal(false)}
+							>
+								<ThemedText style={{ color: theme.error }}>Fechar</ThemedText>
 							</TouchableOpacity>
 						</View>
 					</View>
@@ -734,8 +714,7 @@ const styles = StyleSheet.create({
 	},
 	transactionList: {
 		gap: 12,
-	},
-	transactionCard: {
+	},	transactionCard: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#fff',
@@ -746,7 +725,6 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.07,
 		shadowRadius: 8,
 		elevation: 2,
-		gap: 12,
 	},
 	cardIconWrap: {
 		width: 44,
