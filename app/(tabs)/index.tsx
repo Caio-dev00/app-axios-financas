@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTransactions } from '../TransactionsContext';
 import { getProfile, getSubscription } from '../supabaseClient';
 
-const CATEGORIAS_PADRAO = [
+const CATEGORIAS_DESPESA = [
 	{ label: "Alimentação", value: "Alimentação" },
 	{ label: "Moradia", value: "Moradia" },
 	{ label: "Transporte", value: "Transporte" },
@@ -64,8 +64,7 @@ export default function DashboardScreen() {
 
 	useEffect(() => {
 		async function loadUserData() {
-			try {
-				const [profile, subscription] = await Promise.all([
+			try {				const [profile, subscription] = await Promise.all([
 					getProfile(),
 					getSubscription()
 				]);
@@ -76,7 +75,6 @@ export default function DashboardScreen() {
 				}
 
 				setIsPro(subscription.isPro);
-				setDaysLeft(subscription.daysLeft);
 
 				if (profile?.created_at) {
 					const createdAt = new Date(profile.created_at);
@@ -107,32 +105,29 @@ export default function DashboardScreen() {
 		setModalVisible(true);
 		setFabMenuVisible(false);
 	};
-
 	const validateForm = () => {
-		if (!form.title.trim()) return 'Título obrigatório';
-		const valor = Number(form.amountStr?.replace(',', '.') || '');
-		if (!form.amountStr || Number.isNaN(valor) || valor <= 0) return 'Valor inválido';
-		if (!form.date.trim()) return 'Data obrigatória';
-		if (form.type === 'income' && !form.source?.trim()) return 'Origem obrigatória';
-		if (form.type === 'expense' && !form.category?.trim()) return 'Categoria obrigatória';
+		if (!form.title.trim()) return "Título obrigatório";
+		const valor = Number(form.amountStr?.replace(",", ".") || "");
+		if (!form.amountStr || Number.isNaN(valor) || valor <= 0) return "Valor inválido";
+		if (!form.date.trim()) return "Data obrigatória";
+		if (form.type === "income" && !form.source?.trim()) return "Origem obrigatória";
+		if (form.type === "expense" && !form.category?.trim()) return "Categoria obrigatória";
 		return null;
 	};
-
 	const handleSave = async () => {
 		setFormError(null);
 		const error = validateForm();
 		if (error) {
 			setFormError(error);
-			setSaving(false);
 			return;
 		}
 		setSaving(true);
 		try {
-			console.log('Form data:', form);
 			const valorFloat = form.amountStr
 				? Number.parseFloat(form.amountStr.replace(",", "."))
 				: 0;
-					const payload = {
+
+			const payload = {
 				title: form.title.trim(),
 				amount: valorFloat,
 				type: form.type,
@@ -143,9 +138,9 @@ export default function DashboardScreen() {
 				notes: form.type === "expense" ? form.notes?.trim() : undefined
 			};
 			
-			console.log('Payload being sent:', payload);
 			await add(payload);
 			setModalVisible(false);
+			setFabMenuVisible(false);
 		} catch (e: unknown) {
 			console.error('Error saving transaction:', e);
 			if (e && typeof e === "object" && "message" in e) {
@@ -402,8 +397,7 @@ export default function DashboardScreen() {
 											onValueChange={(v: string) => setForm((f) => ({ ...f, category: v }))}
 											style={{ color: form.category ? theme.text : theme.gray }}
 										>
-											<Picker.Item label="Selecione uma categoria" value="" color={theme.gray} />
-											{CATEGORIAS_PADRAO.map((cat) => (
+											<Picker.Item label="Selecione uma categoria" value="" color={theme.gray} />											{CATEGORIAS_DESPESA.map((cat) => (
 												<Picker.Item
 													key={cat.value}
 													label={cat.label}
@@ -564,14 +558,7 @@ export default function DashboardScreen() {
 							<ThemedText style={{ fontSize: 17, color: theme.text, marginBottom: 8 }}>
 								Plano atual: <ThemedText style={{ fontWeight: 'bold', color: isPro ? theme.tint : '#888' }}>{isPro ? 'PRO' : 'Free'}</ThemedText>
 							</ThemedText>
-							
-							{isPro && daysLeft !== null && (
-								<ThemedText style={{ color: theme.text, marginBottom: 8 }}>
-									Dias restantes: <ThemedText style={{ fontWeight: 'bold', color: theme.tint }}>{daysLeft}</ThemedText>
-								</ThemedText>
-							)}
-
-							{daysActive !== null && (
+									{daysActive !== null && (
 								<ThemedText style={{ color: theme.text, marginBottom: 16, textAlign: 'center' }}>
 									Dias ativos: <ThemedText style={{ fontWeight: 'bold', color: theme.text }}>{daysActive}</ThemedText>
 								</ThemedText>

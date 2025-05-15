@@ -173,13 +173,7 @@ export default function ProfileScreen() {
             <ThemedText style={[styles.infoValue, subscription.isPro && { color: theme.tint, fontWeight: 'bold' }]}>
               {subscription.isPro ? 'PRO' : 'Free'}
             </ThemedText>
-          </View>
-          {subscription.isPro && subscription.daysLeft !== null && (
-            <View style={styles.infoRow}>
-              <ThemedText style={styles.infoLabel}>Dias Restantes</ThemedText>
-              <ThemedText style={[styles.infoValue, { color: theme.tint }]}>{subscription.daysLeft}</ThemedText>
-            </View>
-          )}
+          </View>          {/* Removido contador de dias restantes */}
           <View style={styles.infoRow}>
             <ThemedText style={styles.infoLabel}>Telefone</ThemedText>
             <ThemedText style={styles.infoValue}>{profile?.phone || 'Não informado'}</ThemedText>
