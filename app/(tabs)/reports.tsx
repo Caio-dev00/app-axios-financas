@@ -65,7 +65,7 @@ const SimplePieChart = ({
 				width: circleSize,
 				height: circleSize,
 				borderRadius: circleSize/2,
-				backgroundColor: data[0].color,
+				backgroundColor: data[0]?.color || '#cccccc',
 				shadowColor: '#000',
 				shadowOffset: { width: 0, height: 3 },
 				shadowOpacity: 0.16,
@@ -87,7 +87,8 @@ const SimplePieChart = ({
 					backgroundColor: 'rgba(255, 255, 255, 0.3)'
 				}} />
 			</View>
-					{/* Legenda abaixo do gráfico - design moderno */}
+			
+			{/* Legenda abaixo do gráfico - design moderno */}
 			<View style={{
 				flexDirection: 'row',
 				flexWrap: 'wrap',
@@ -97,6 +98,7 @@ const SimplePieChart = ({
 				marginTop: 12
 			}}>
 				{data.map((item, index) => {
+					if (!item || typeof item.value !== 'number') return null;
 					const percentage = ((item.value / total) * 100).toFixed(1);
 					return (
 						<View key={`legend-${index}`} style={{
@@ -122,7 +124,7 @@ const SimplePieChart = ({
 								marginRight: 6
 							}} />
 							<ThemedText style={{ fontSize: 13, fontWeight: '500' }}>
-								{item.name} ({percentage}%)
+								{item.name || "Categoria"} ({percentage}%)
 							</ThemedText>
 						</View>
 					);
@@ -449,8 +451,7 @@ export default function ReportsScreen() {
 				<ThemedText style={[styles.categoryTitle, { color: theme.text }]}>
 					Despesas por Categoria
 				</ThemedText>
-				
-				{total > 0 && chartData.length > 0 && (
+						{total > 0 && chartData.length > 0 ? (
 					<View style={styles.chartContainer}>
 						{/* Versão moderna com design atraente */}
 						<SimplePieChart
@@ -459,7 +460,7 @@ export default function ReportsScreen() {
 							height={220}
 						/>
 					</View>
-				)}
+				) : null}
 				
 				<ThemedText style={[styles.sectionTitle, { color: theme.text, marginTop: 5 }]}>
 					Detalhamento por Categoria
@@ -513,8 +514,7 @@ export default function ReportsScreen() {
 							Nenhuma categoria com gastos registrados
 						</ThemedText>
 					)}
-					
-					{validCategories.length > 0 && (
+							{validCategories.length > 0 ? (
 						<View style={[styles.totalRow, { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
 							<ThemedText style={[styles.totalLabel, { color: theme.text }]}>
 								Total de Despesas
@@ -523,7 +523,7 @@ export default function ReportsScreen() {
 								{formatCurrency(total)}
 							</ThemedText>
 						</View>
-					)}
+					) : null}
 				</View>
 			</View>
 		);
@@ -537,11 +537,10 @@ export default function ReportsScreen() {
 					onPress={() => setShowMonthPicker(true)}
 					activeOpacity={0.85}
 				>
-					<Ionicons name="calendar-outline" size={18} color={theme.text} style={{ marginRight: 8 }} />
-					<ThemedText style={[styles.monthText, { color: theme.text }]}>
-						{MONTHS && selectedMonth >= 0 && selectedMonth < MONTHS.length 
-							? MONTHS[selectedMonth] 
-							: 'MÊS'} {selectedYear}
+					<Ionicons name="calendar-outline" size={18} color={theme.text} style={{ marginRight: 8 }} />					<ThemedText style={[styles.monthText, { color: theme.text }]}>
+						{(MONTHS && selectedMonth >= 0 && selectedMonth < MONTHS.length) 
+							? `${MONTHS[selectedMonth]} ${selectedYear}`
+							: `MÊS ${selectedYear}`}
 					</ThemedText>
 					<Ionicons name="chevron-down" size={18} color={theme.text} style={{ marginLeft: 8 }} />
 				</TouchableOpacity>
@@ -599,11 +598,10 @@ export default function ReportsScreen() {
 			<ScrollView 
 				style={[styles.container, { backgroundColor: theme.background }]}
 				showsVerticalScrollIndicator={false}
-			>
-				<ThemedView style={styles.content}>
+			>				<ThemedView style={styles.content}>
 					{renderTimeRangeSelector()}
 					{renderSummaryCard()}
-					{renderCategoryBreakdown()}
+					{convertedValues.totalExpense > 0 ? renderCategoryBreakdown() : null}
 				</ThemedView>
 			</ScrollView>
 		</SafeAreaView>
