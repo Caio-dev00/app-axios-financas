@@ -20,6 +20,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTransactions } from "../TransactionsContext";
+import { useCurrency } from "../contexts/CurrencyContext";
+import { currencyFormats } from "../services/currencyService";
 import type { Transaction } from "../supabaseClient";
 
 const CATEGORIAS_DESPESA = [
@@ -292,7 +294,6 @@ export default function TransactionsScreen() {
 			return "Categoria obrigatória";
 		return null;
 	};
-
 	const handleSave = async () => {
 		setFormError(null);
 		const error = validateForm();
@@ -303,15 +304,21 @@ export default function TransactionsScreen() {
 		}
 		setSaving(true);
 		try {
-			const valorFloat = form.amountStr
+			let valorFloat = form.amountStr
 				? Number.parseFloat(form.amountStr.replace(",", "."))
 				: 0;
+			
+			// Se a moeda atual não for BRL, converte o valor para BRL antes de salvar
+			if (currency !== 'BRL') {
+				valorFloat = await convertAmount(valorFloat, currency, 'BRL');
+			}
+
 			const payload = {
 				...form,
 				amount: valorFloat,
 				notes: form.notes || undefined,
 				is_recurring: form.is_recurring || false,
-			};			if (editing?.id) {
+			};if (editing?.id) {
 				await edit(editing.id, payload);
 			} else {
 				await add(payload);
@@ -350,59 +357,74 @@ export default function TransactionsScreen() {
 			]
 		);
 	};
+	const { currency, formatCurrency, convertAmount } = useCurrency();
 
-	const renderTransaction = ({ item }: { item: Transaction }) => (
-		<View style={styles.transactionCard}>
-			<View style={styles.cardLeft}>
-				<View style={styles.cardIconWrap}>
-					<Ionicons
-						name={item.type === "income" ? "cash-outline" : "cart-outline"}
-						size={28}
-						color={item.type === "income" ? theme.tint : theme.error}
-					/>
+	const TransactionItem = ({ item }: { item: Transaction }) => {
+		const [convertedAmount, setConvertedAmount] = React.useState<number>(item.amount);
+
+		React.useEffect(() => {
+			const updateAmount = async () => {
+				const converted = await convertAmount(item.amount, 'BRL', currency);
+				setConvertedAmount(converted);
+			};
+			updateAmount();
+		}, [item.amount]);
+
+		return (
+			<View style={styles.transactionCard}>
+				<View style={styles.cardLeft}>
+					<View style={styles.cardIconWrap}>
+						<Ionicons
+							name={item.type === "income" ? "cash-outline" : "cart-outline"}
+							size={28}
+							color={item.type === "income" ? theme.tint : theme.error}
+						/>
+					</View>
+					<View style={styles.cardInfo}>
+						<ThemedText style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
+							{item.title?.trim() ? item.title : "Sem título"}
+						</ThemedText>
+						<ThemedText style={styles.cardCategory} numberOfLines={1} ellipsizeMode="tail">
+							{item.type === "income"
+								? (item.source?.trim() ? item.source : "Sem categoria")
+								: (item.category?.trim() ? item.category : "Sem categoria")}
+						</ThemedText>
+						<ThemedText style={styles.cardDate} numberOfLines={1} ellipsizeMode="tail">{item.date}</ThemedText>
+					</View>
 				</View>
-				<View style={styles.cardInfo}>
-					<ThemedText style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
-						{item.title?.trim() ? item.title : "Sem título"}
+				<View style={styles.cardRight}>
+					<ThemedText
+						style={[
+							styles.cardValue,
+							item.type === "income" ? styles.incomeValue : styles.expenseValue,
+						]}
+						numberOfLines={1}
+						ellipsizeMode="tail"
+					>
+						{item.type === "income" ? "+" : "-"}{formatCurrency(convertedAmount)}
 					</ThemedText>
-					<ThemedText style={styles.cardCategory} numberOfLines={1} ellipsizeMode="tail">
-						{item.type === "income"
-							? (item.source?.trim() ? item.source : "Sem categoria")
-							: (item.category?.trim() ? item.category : "Sem categoria")}
-					</ThemedText>
-					<ThemedText style={styles.cardDate} numberOfLines={1} ellipsizeMode="tail">{item.date}</ThemedText>
+					<View style={styles.cardActions}>
+						<TouchableOpacity
+							onPress={() => item.id && handleDelete(item.id, item.type)}
+							style={styles.actionBtn}
+							activeOpacity={0.7}
+						>
+							<Feather name="trash-2" size={20} color={theme.error} />
+						</TouchableOpacity>
+						<TouchableOpacity
+							onPress={() => openEditModal(item)}
+							style={styles.actionBtn}
+							activeOpacity={0.7}
+						>
+							<Feather name="edit-3" size={20} color={theme.tint} />
+						</TouchableOpacity>
+					</View>
 				</View>
 			</View>
-			<View style={styles.cardRight}>
-				<ThemedText
-					style={[
-						styles.cardValue,
-						item.type === "income" ? styles.incomeValue : styles.expenseValue,
-					]}
-					numberOfLines={1}
-					ellipsizeMode="tail"
-				>
-					{item.type === "income" ? "+" : "-"}R$ {item.amount.toFixed(2)}
-				</ThemedText>
-				<View style={styles.cardActions}>
-					<TouchableOpacity
-						onPress={() => item.id && handleDelete(item.id, item.type)}
-						style={styles.actionBtn}
-						activeOpacity={0.7}
-					>
-						<Feather name="trash-2" size={20} color={theme.error} />
-					</TouchableOpacity>
-					<TouchableOpacity
-						onPress={() => openEditModal(item)}
-						style={styles.actionBtn}
-						activeOpacity={0.7}
-					>
-						<Feather name="edit-3" size={20} color={theme.tint} />
-					</TouchableOpacity>
-				</View>
-			</View>
-		</View>
-	);
+		);
+	};
+
+	const renderTransaction = ({ item }: { item: Transaction }) => <TransactionItem item={item} />;
 
 	return (
 		<SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom', 'left', 'right']}>
@@ -562,23 +584,26 @@ export default function TransactionsScreen() {
 											))}
 										</Picker>
 									</View>
-								)}
-
-								<TextInput
-									style={[styles.input, styles.inputModern]}
-									placeholder="Valor"
-									placeholderTextColor={theme.gray}
-									value={form.amountStr ?? ""}
-									onChangeText={(v) => {
-										let valor = v.replace(/[^0-9.,]/g, "");
-										const match = valor.match(/^(\d*)([.,]?(\d{0,2})?)?/);
-										if (match) valor = match[1] + (match[2] || "");
-										setForm((f) => ({ ...f, amountStr: valor }));
-									}}
-									keyboardType="decimal-pad"
-									numberOfLines={1}
-									textAlignVertical="center"
-								/>
+								)}								<View style={[styles.inputModern, { flexDirection: 'row', alignItems: 'center' }]}>
+									<ThemedText style={{ marginRight: 8, fontSize: 15, color: theme.text }}>
+										{currencyFormats[currency].symbol}
+									</ThemedText>
+									<TextInput
+										style={[styles.input, { flex: 1, borderWidth: 0, padding: 0, margin: 0, backgroundColor: 'transparent' }]}
+										placeholder="0,00"
+										placeholderTextColor={theme.gray}
+										value={form.amountStr ?? ""}
+										onChangeText={(v) => {
+											let valor = v.replace(/[^0-9.,]/g, "");
+											const match = valor.match(/^(\d*)([.,]?(\d{0,2})?)?/);
+											if (match) valor = match[1] + (match[2] || "");
+											setForm((f) => ({ ...f, amountStr: valor }));
+										}}
+										keyboardType="decimal-pad"
+										numberOfLines={1}
+										textAlignVertical="center"
+									/>
+								</View>
 
 								<TouchableOpacity
 									style={[styles.input, styles.inputModern, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
@@ -763,9 +788,7 @@ export default function TransactionsScreen() {
 								</TouchableOpacity>
 								<TouchableOpacity onPress={() => { setSelectedMonth(today.getMonth()); setSelectedYear(today.getFullYear()); setShowMonthPicker(false); }}>
 									<ThemedText style={{ color: theme.tint, fontWeight: 'bold', fontSize: 15, paddingVertical: 10 }}>MÊS ATUAL</ThemedText>
-								</TouchableOpacity>
-							</View>
-						</View>
+								</TouchableOpacity>							</View>						</View>
 					</View>
 				</Modal>
 			</ThemedView>

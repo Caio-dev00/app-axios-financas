@@ -46,8 +46,8 @@ export interface UserProfile {
   phone?: string;
   avatar_url?: string;
   is_pro?: boolean;
-  created_at?: string;
-  telefone?: string;
+  created_at?: string;  occupation?: string;
+  currency_preference?: string;
 }
 
 export const getToken = async () => {
@@ -368,16 +368,31 @@ export const updateProfile = async (profile: Partial<UserProfile>): Promise<User
     const response = await supabaseClient.patch(`/rest/v1/profiles`, profile, {
       params: {
         id: `eq.${user.id}`
+      },
+      headers: {
+        'Prefer': 'return=representation'
       }
     });
 
-    if (response.data?.[0]) {
-      return response.data[0];
+    if (!response.data?.[0]) {
+      throw new Error('Erro ao atualizar perfil: Resposta inválida do servidor');
     }
-    throw new Error('Erro ao atualizar perfil');
+
+    return response.data[0];
   } catch (error) {
     console.error('Error updating profile:', error);
-    throw new Error('Erro ao atualizar perfil');
+    if (isAxiosError(error)) {
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+      }
+      if (error.response?.status === 404) {
+        throw new Error('Perfil não encontrado.');
+      }
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+    }
+    throw new Error('Erro ao atualizar perfil. Tente novamente.');
   }
 };
 

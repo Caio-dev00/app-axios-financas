@@ -6,6 +6,7 @@ import 'react-native-reanimated';
 import { AuthProvider } from './contexts/AuthContext';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { CurrencyProvider } from './contexts/CurrencyContext';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -17,16 +18,17 @@ export default function RootLayout() {
     return null;
   }
 
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+  return (    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AuthProvider>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="auth/login" options={{ headerShown: false }} />
-          <Stack.Screen name="auth/register" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" options={{ headerShown: false }} />
-        </Stack>
-        <StatusBar style="auto" />
+        <CurrencyProvider>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+            <Stack.Screen name="auth/register" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" options={{ headerShown: false }} />
+          </Stack>
+          <StatusBar style="auto" />
+        </CurrencyProvider>
       </AuthProvider>
     </ThemeProvider>
   );

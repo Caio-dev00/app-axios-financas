@@ -9,6 +9,8 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTransactions } from '../TransactionsContext';
+import { TransactionCard } from '../components/TransactionCard';
+import { useCurrency } from '../contexts/CurrencyContext';
 import { getProfile, getSubscription } from '../supabaseClient';
 
 const CATEGORIAS_DESPESA = [
@@ -23,10 +25,10 @@ const CATEGORIAS_DESPESA = [
 	{ label: "Outros", value: "Outros" },
 ];
 
-export default function DashboardScreen() {
-	const colorScheme = useColorScheme();
+export default function DashboardScreen() {	const colorScheme = useColorScheme();
 	const isDark = colorScheme === "dark";
 	const theme = Colors[isDark ? "dark" : "light"];
+	const { currency, formatCurrency, convertAmount } = useCurrency();
 
 	const { transactions, loading, add } = useTransactions();
 	const [fabMenuVisible, setFabMenuVisible] = useState(false);
@@ -35,7 +37,33 @@ export default function DashboardScreen() {
 	const [daysActive, setDaysActive] = useState<number | null>(null);
 	const [userName, setUserName] = useState<string>('');
 	const [isPro, setIsPro] = useState(false);
-	const [daysLeft, setDaysLeft] = useState<number | null>(null);
+	const [convertedValues, setConvertedValues] = useState({
+		totalIncome: 0,
+		totalExpense: 0,
+		balance: 0
+	});
+
+	// Função para calcular e atualizar os totais
+	const updateTotals = React.useCallback(async () => {
+		let totalIncome = 0;
+		let totalExpense = 0;
+
+		for (const tx of transactions) {
+			const convertedAmount = await convertAmount(tx.amount, 'BRL', currency);
+			if (tx.type === 'income') {
+				totalIncome += convertedAmount;
+			} else {
+				totalExpense += convertedAmount;
+			}
+		}
+
+		const balance = totalIncome - totalExpense;
+		setConvertedValues({
+			totalIncome,
+			totalExpense,
+			balance
+		});
+	}, [transactions, currency, convertAmount]);
 	const [form, setForm] = useState<{
 		title: string;
 		amount: number;
@@ -61,6 +89,10 @@ export default function DashboardScreen() {
 	const [showDatePicker, setShowDatePicker] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
+	// Atualizar totais quando as transações ou moeda mudarem
+	useEffect(() => {
+		updateTotals();
+	}, [transactions, currency, updateTotals]);
 
 	useEffect(() => {
 		async function loadUserData() {
@@ -152,15 +184,25 @@ export default function DashboardScreen() {
 		setSaving(false);
 	};
 
+	// Função para converter e atualizar os valores
+	// Removida porque não está sendo usada
 
-	// Calcular receitas, despesas e saldo dinamicamente
-	const totalIncome = transactions
-		.filter((t) => t.type === "income")
-		.reduce((sum, t) => sum + (t.amount || 0), 0);
-	const totalExpense = transactions
-		.filter((t) => t.type === "expense")
-		.reduce((sum, t) => sum + (t.amount || 0), 0);
-	const balance = totalIncome - totalExpense;
+	// Função para converter valor de uma transação
+	const convertTransactionAmount = React.useCallback(
+		async (tx: { id?: string; amount: number }) => {
+			if (!tx.id) return;
+			await convertAmount(tx.amount, 'BRL', currency);
+			// Previously updated convertedTransactions, but it's unused.
+		},
+		[convertAmount, currency]
+	);
+
+	// Converter valores de transações quando a moeda ou transações mudam
+	useEffect(() => {
+		transactions.forEach(tx => {
+			if (tx.id) convertTransactionAmount(tx);
+		});
+	}, [transactions, currency, convertTransactionAmount]);
 
 	return (
 		<SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom', 'left', 'right']}>
@@ -193,7 +235,7 @@ export default function DashboardScreen() {
 							Saldo em contas
 						</ThemedText>
 						<ThemedText style={[styles.balanceValue, { color: theme.text }]}>
-							R$ {balance.toFixed(2)}
+							{formatCurrency(convertedValues.balance)}
 						</ThemedText>
 						<View style={styles.balanceRow}>
 							<View style={styles.balanceItem}>
@@ -206,7 +248,7 @@ export default function DashboardScreen() {
 									Receitas
 								</ThemedText>
 								<ThemedText style={[styles.incomeValue, { color: theme.tint }]}>
-									R$ {totalIncome.toFixed(2)}
+									{formatCurrency(convertedValues.totalIncome)}
 								</ThemedText>
 							</View>
 							<View style={styles.balanceItem}>
@@ -219,7 +261,7 @@ export default function DashboardScreen() {
 									Despesas
 								</ThemedText>
 								<ThemedText style={[styles.expenseValue, { color: theme.error }]}>
-									R$ {totalExpense.toFixed(2)}
+									{formatCurrency(convertedValues.totalExpense)}
 								</ThemedText>
 							</View>
 						</View>
@@ -237,41 +279,11 @@ export default function DashboardScreen() {
 							) : transactions.length === 0 ? (
 								<ThemedText>Nenhuma transação encontrada.</ThemedText>
 							) : (
-								transactions.slice(0, 5).map((tx) => (
-									<View
+								transactions.slice(0, 5).map((tx) => (									<TransactionCard
 										key={tx.id}
-										style={[
-											styles.transactionCard,
-											{ backgroundColor: theme.card },
-										]}
-									>
-										<View style={styles.cardIconWrap}>
-											<Ionicons
-												name={tx.type === "income" ? "cash-outline" : "cart-outline"}
-												size={28}
-												color={tx.type === "income" ? theme.tint : theme.error}
-											/>
-										</View>
-										<View style={styles.cardInfo}>
-											<ThemedText style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
-												{tx.title?.trim() ? tx.title : "Sem título"}
-											</ThemedText>
-											<ThemedText style={styles.cardCategory} numberOfLines={1} ellipsizeMode="tail">
-												{tx.type === "income"
-													? (tx.source?.trim() ? tx.source : "Sem categoria")
-													: (tx.category?.trim() ? tx.category : "Sem categoria")}
-											</ThemedText>
-											<ThemedText style={styles.cardDate}>{tx.date}</ThemedText>
-										</View>
-										<ThemedText
-											style={[
-												styles.cardValue,
-												tx.type === "income" ? { color: '#4CAF50' } : { color: '#FF5252' },
-											]}
-										>
-											{tx.type === "income" ? "+" : "-"}R$ {tx.amount.toFixed(2)}
-										</ThemedText>
-									</View>
+										transaction={tx}
+										theme={theme}
+									/>
 								))
 							)}
 						</View>

@@ -45,25 +45,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isInitialized: false,
     error: null,
     lastAuthCheck: null
-  });
-
-  const signIn = useCallback(async (email: string, password: string) => {
+  });  const signIn = useCallback(async (email: string, password: string) => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
-
       if (!validateEmail(email)) {
-        throw new Error('Email inválido');
+        setState(prev => ({ 
+          ...prev, 
+          error: 'Email inválido',
+          isLoading: false 
+        }));
+        return;
       }
 
       const pwdError = validatePassword(password);
       if (pwdError) {
-        throw new Error(pwdError);
+        setState(prev => ({ 
+          ...prev, 
+          error: pwdError,
+          isLoading: false 
+        }));
+        return;
       }
 
       const auth = await supabase.signIn(email.trim(), password.trim());
       
+      if (!auth?.user?.id) {
+        setState(prev => ({
+          ...prev,
+          error: 'Credenciais inválidas',
+          isLoading: false
+        }));
+        return;
+      }
+
       try {
-        // Buscar o perfil do usuário
         const profileResponse = await supabaseClient.get('/rest/v1/profiles?select=*', {
           params: {
             id: `eq.${auth.user.id}`,
@@ -83,20 +98,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             lastAuthCheck: new Date()
           }));
         } else {
-          throw new Error('Perfil não encontrado');
+          setState(prev => ({
+            ...prev,
+            error: 'Perfil não encontrado',
+            isLoading: false
+          }));
         }
       } catch (error) {
-        console.error('Error fetching profile:', error);
-        throw new Error('Erro ao carregar perfil do usuário');
+        console.debug('Error fetching profile:', error);
+        setState(prev => ({
+          ...prev,
+          error: 'Erro ao carregar perfil do usuário',
+          isLoading: false
+        }));
       }
     } catch (error: any) {
-      console.error('Sign in error:', error);
+      console.debug('Sign in error:', error);
       setState(prev => ({
         ...prev,
-        error: error.message || 'Erro ao fazer login',
+        error: 'Erro ao fazer login',
         isLoading: false
       }));
-      throw error;
     }
   }, []);
 
@@ -155,6 +177,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { user, token } = await supabase.getSession();
       
       if (!user || !token) {
+        setState(prev => ({
+          ...prev,
+          user: null,
+          isLoading: false,
+          error: null,
+          lastAuthCheck: new Date()
+        }));
         return false;
       }
 
@@ -174,16 +203,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               ...profileResponse.data[0]
             },
             lastAuthCheck: new Date(),
+            isLoading: false,
             error: null
           }));
           return true;
         }
       } catch (error) {
-        console.error('Error fetching profile:', error);
+        // Handle profile fetch error silently
+        console.debug('Error fetching profile:', error);
+        setState(prev => ({
+          ...prev,
+          user: null,
+          isLoading: false,
+          error: null,
+          lastAuthCheck: new Date()
+        }));
       }
       return false;
     } catch (error) {
-      console.error('Session validation error:', error);
+      // Handle session validation error silently
+      console.debug('Session validation error:', error);
+      setState(prev => ({
+        ...prev,
+        user: null,
+        isLoading: false,
+        error: null,
+        lastAuthCheck: new Date()
+      }));
       return false;
     }
   }, []);
@@ -192,7 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
-  // Initial session check
+  // Initial session check and refresh mechanism
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -200,22 +246,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!isValid) {
           await signOut();
         }
-        setState(prev => ({ 
-          ...prev, 
-          isInitialized: true, 
-          isLoading: false 
-        }));
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        console.debug('Error initializing auth:', error);
+      } finally {
         setState(prev => ({ 
           ...prev, 
           isInitialized: true, 
-          isLoading: false 
+          isLoading: false,
+          error: null
         }));
       }
     };
 
     initializeAuth();
+
+    // Set up session refresh
+    const refreshInterval = setInterval(async () => {
+      try {
+        await validateSession();
+      } catch (error) {
+        console.debug('Session refresh error:', error);
+      }
+    }, 5 * 60 * 1000); // Refresh every 5 minutes
+
+    return () => clearInterval(refreshInterval);
   }, [validateSession, signOut]);
 
   const contextValue = {
