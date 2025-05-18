@@ -1,6 +1,7 @@
 // Componente personalizado de gráfico de pizza
 import React from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { ThemedText } from '../../components/ThemedText';
 
 type ChartData = {
     name: string;
@@ -91,10 +92,10 @@ const SimplePieChart = ({
                                 height: 10,
                                 borderRadius: 5,
                                 backgroundColor: item.color,
-                                marginRight: 6
-                            }} />                            <Text style={{ fontSize: 13, fontWeight: '500', color: '#333' }}>
+                                marginRight: 6                            }} />
+                            <ThemedText style={{ fontSize: 13, fontWeight: '500', color: '#333' }}>
                                 {item.name} ({percentage}%)
-                            </Text>
+                            </ThemedText>
                         </View>
                     );
                 })}

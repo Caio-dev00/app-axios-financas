@@ -1,6 +1,6 @@
 // Arquivo de utilitários para texto seguro
 import React from 'react';
-import { Text } from 'react-native';
+import { ThemedText } from '../../components/ThemedText';
 
 // SimpleSafeText Provider - apenas para manter compatibilidade
 export function SafeTextProvider({ children }: { children: React.ReactNode }) {
@@ -8,7 +8,7 @@ export function SafeTextProvider({ children }: { children: React.ReactNode }) {
 }
 export default SafeTextProvider;
 
-// Função para garantir que o conteúdo é seguro para Text
+// Função para garantir que o conteúdo é seguro para ThemedText
 function ensureSafeText(content: any): React.ReactNode {
   // Se for null, undefined ou já é um elemento React - retornar como está
   if (content === null || content === undefined || React.isValidElement(content)) {
@@ -28,10 +28,10 @@ function ensureSafeText(content: any): React.ReactNode {
   }
 }
 
-// Componente Text seguro
-export function SafeText({ children, ...props }: React.ComponentProps<typeof Text>) {
+// Componente ThemedText seguro
+export function SafeText({ children, ...props }: React.ComponentProps<typeof ThemedText>) {
   const safeContent = ensureSafeText(children);
-  return <Text {...props}>{safeContent}</Text>;
+  return <ThemedText {...props}>{safeContent}</ThemedText>;
 }
 
 // Função de monkeypatch simplificada que não faz nada (apenas para compatibilidade)

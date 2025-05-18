@@ -1,24 +1,24 @@
 // Este arquivo contém patches para corrigir problemas de renderização de texto no React Navigation
 import React from 'react';
-import { Text } from 'react-native';
+import { ThemedText } from '../../components/ThemedText';
 
-// Função para garantir que qualquer valor seja renderizado com segurança dentro de componentes Text
+// Função para garantir que qualquer valor seja renderizado com segurança dentro de componentes ThemedText
 export function ensureTextComponent(value: any) {
   // Não precisamos envolver componentes React ou null/undefined
   if (value === null || value === undefined || React.isValidElement(value)) {
     return value;
   }
   
-  // Para strings, números, booleanos - envolver em Text
+  // Para strings, números, booleanos - envolver em ThemedText
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return <Text>{String(value)}</Text>;
+    return <ThemedText>{String(value)}</ThemedText>;
   }
   
   // Para outros tipos (objetos, arrays) - converter para string segura
   try {
-    return <Text>{JSON.stringify(value)}</Text>;
+    return <ThemedText>{JSON.stringify(value)}</ThemedText>;
   } catch {
-    return <Text>[Objeto]</Text>;
+    return <ThemedText>[Objeto]</ThemedText>;
   }
 }
 

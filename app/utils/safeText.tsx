@@ -1,10 +1,11 @@
-// Este componente destina-se a envolver textos em componententes <Text> de forma segura
+// Este componente destina-se a envolver textos em componententes <ThemedText> de forma segura
 import React from 'react';
-import { Text, TextProps } from 'react-native';
+import { TextProps } from 'react-native';
+import { ThemedText } from '../../components/ThemedText';
 
-// Uma função auxiliar para garantir que todos os textos estão dentro de componentes Text
+// Uma função auxiliar para garantir que todos os textos estão dentro de componentes ThemedText
 export const SafeText = (props: TextProps) => {
-  return <Text {...props} />;
+  return <ThemedText {...props} />;
 };
 
 // Função para garantir que um valor será renderizado como string dentro de um componente Text
