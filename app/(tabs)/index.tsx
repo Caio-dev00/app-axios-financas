@@ -206,7 +206,7 @@ export default function DashboardScreen() {	const colorScheme = useColorScheme()
 
 	return (
 		<SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom', 'left', 'right']}>
-			<StatusBar style={isDark ? "light" : "dark"} backgroundColor={theme.tint} />
+			<StatusBar style={isDark ? "light" : "dark"} />
 			<View style={[styles.container, { backgroundColor: theme.background }]}>
 				{/* Top Bar */}
 				<View style={styles.topBar}>
@@ -235,7 +235,7 @@ export default function DashboardScreen() {	const colorScheme = useColorScheme()
 							Saldo em contas
 						</ThemedText>
 						<ThemedText style={[styles.balanceValue, { color: theme.text }]}>
-							{formatCurrency(convertedValues.balance)}
+							{typeof convertedValues.balance === 'number' ? formatCurrency(convertedValues.balance) : ''}
 						</ThemedText>
 						<View style={styles.balanceRow}>
 							<View style={styles.balanceItem}>
@@ -279,7 +279,8 @@ export default function DashboardScreen() {	const colorScheme = useColorScheme()
 							) : transactions.length === 0 ? (
 								<ThemedText>Nenhuma transação encontrada.</ThemedText>
 							) : (
-								transactions.slice(0, 5).map((tx) => (									<TransactionCard
+								transactions.slice(0, 5).map((tx) => (
+									<TransactionCard
 										key={tx.id}
 										transaction={tx}
 										theme={theme}
@@ -529,7 +530,7 @@ export default function DashboardScreen() {	const colorScheme = useColorScheme()
 								</View>
 								{formError && (
 									<ThemedText style={{ color: theme.error, marginBottom: 16, textAlign: "center" }}>
-										{formError}
+										{formError ? String(formError) : ''}
 									</ThemedText>
 								)}
 								<View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>

@@ -149,3 +149,5 @@ export function useTransactions() {
   }
   return context;
 }
+
+export default TransactionsProvider;

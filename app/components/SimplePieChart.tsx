@@ -1,7 +1,6 @@
 // Componente personalizado de gráfico de pizza
-import { ThemedText } from "@/components/ThemedText";
 import React from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 
 type ChartData = {
     name: string;
@@ -27,10 +26,8 @@ const SimplePieChart = ({
     const total = data.reduce((sum, item) => sum + item.value, 0);
     if (total <= 0) return null;
     
-    // Dimensões do "gráfico" - um pouco maior para melhor visualização
     const circleSize = Math.min(width * 0.48, height * 0.58);
     
-    // Design mais moderno para o gráfico de pizza
     return (
         <View style={{ width, height, alignItems: 'center' }}>
             {/* Círculo colorido com design moderno e efeito visual */}
@@ -95,9 +92,9 @@ const SimplePieChart = ({
                                 borderRadius: 5,
                                 backgroundColor: item.color,
                                 marginRight: 6
-                            }} />                            <ThemedText style={{ fontSize: 13, fontWeight: '500' }}>
+                            }} />                            <Text style={{ fontSize: 13, fontWeight: '500', color: '#333' }}>
                                 {item.name} ({percentage}%)
-                            </ThemedText>
+                            </Text>
                         </View>
                     );
                 })}

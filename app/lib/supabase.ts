@@ -144,6 +144,7 @@ export class SupabaseAuth {
         token
       };
     } catch (error) {
+      console.error('Erro ao obter sessão:', error);
       return { user: null, token: null };
     }
   }

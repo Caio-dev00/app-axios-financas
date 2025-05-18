@@ -107,9 +107,11 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.infoContainer}>
-              <ThemedText style={[styles.emailText, { color: theme.text }]}>{user?.email}</ThemedText>
+              <ThemedText style={[styles.emailText, { color: theme.text }]}>
+                {user?.email ? String(user.email) : ''}
+              </ThemedText>
               <ThemedText style={[styles.infoText, { color: theme.text }]}>
-                Moeda atual: {currency}
+                Moeda atual: {typeof currency === 'string' ? currency : ''}
               </ThemedText>
               {exchangeRate !== 1 && (
                 <ThemedText style={[styles.infoText, { color: theme.text }]}>
@@ -202,7 +204,7 @@ export default function ProfileScreen() {
 
             {error && (
               <ThemedText style={[styles.errorText, { color: theme.error }]}>
-                {error}
+                {error ? String(error) : ''}
               </ThemedText>
             )}
 

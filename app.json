@@ -1,5 +1,4 @@
-{
-  "expo": {
+{  "expo": {
     "name": "app-axios-financas",
     "slug": "app-axios-financas",
     "version": "1.0.0",
@@ -8,6 +7,14 @@
     "scheme": "appaxiosfinancas",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "extra": {
+      "eas": {
+        "projectId": "app-axios-financas"
+      },
+      "react-native": {
+        "unstable_allowDiagnosticWarnings": true
+      }
+    },
     "ios": {
       "supportsTablet": true
     },

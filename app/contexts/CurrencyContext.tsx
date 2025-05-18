@@ -1,9 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
-  CurrencyCode,
-  fetchExchangeRates,
-  formatCurrency as formatCurrencyUtil,
-  getActiveCurrency
+    CurrencyCode,
+    fetchExchangeRates,
+    formatCurrency as formatCurrencyUtil,
+    getActiveCurrency
 } from '../services/currencyService';
 import { getProfile } from '../supabaseClient';
 
@@ -134,3 +134,5 @@ export function CurrencyProvider({ children }: CurrencyProviderProps) {
 }
 
 export const useCurrency = () => useContext(CurrencyContext);
+
+export default CurrencyProvider;

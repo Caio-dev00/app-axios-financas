@@ -122,3 +122,5 @@ export const getActiveCurrency = (preference?: string | null): CurrencyCode => {
   }
   return 'BRL';
 };
+
+export default currencyFormats;

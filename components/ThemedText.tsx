@@ -1,3 +1,4 @@
+import React from 'react';
 import { StyleSheet, Text, type TextProps } from 'react-native';
 
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -8,14 +9,34 @@ export type ThemedTextProps = TextProps & {
   type?: 'default' | 'title' | 'defaultSemiBold' | 'subtitle' | 'link';
 };
 
+// Função para verificar se a children prop é segura para renderizar 
+const ensureSafeChildren = (children: any) => {
+  if (children === null || children === undefined) {
+    return null;
+  }
+  
+  // Já está seguro caso seja ReactNode ou string
+  if (typeof children === 'string' || typeof children === 'number' || 
+      React.isValidElement(children) || Array.isArray(children)) {
+    return children;
+  }
+  
+  // Converte para string segura caso seja um tipo não compatível
+  return String(children);
+};
+
 export function ThemedText({
   style,
   lightColor,
   darkColor,
   type = 'default',
+  children,
   ...rest
 }: ThemedTextProps) {
   const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
+  
+  // Garantir que o children é renderizável de forma segura
+  const safeChildren = ensureSafeChildren(children);
 
   return (
     <Text
@@ -29,7 +50,9 @@ export function ThemedText({
         style,
       ]}
       {...rest}
-    />
+    >
+      {safeChildren}
+    </Text>
   );
 }
 

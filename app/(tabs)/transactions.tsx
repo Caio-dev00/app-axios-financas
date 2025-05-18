@@ -661,7 +661,9 @@ export default function TransactionsScreen() {
 											<Ionicons name="checkmark" size={18} color="#fff" />
 										)}
 									</TouchableOpacity>
-									<ThemedText style={{ marginLeft: 10, color: theme.text, fontSize: 15 }}>Transação recorrente</ThemedText>
+									<ThemedText style={{ marginLeft: 10, color: theme.text, fontSize: 15 }}>
+										Transação recorrente
+									</ThemedText>
 								</View>
 
 								<View style={{ flexDirection: "row", marginVertical: 10, gap: 10 }}>
@@ -705,7 +707,7 @@ export default function TransactionsScreen() {
 
 								{formError && (
 									<ThemedText style={{ color: theme.error, marginBottom: 16, textAlign: "center" }}>
-										{formError}
+										{formError ? String(formError) : ''}
 									</ThemedText>
 								)}
 

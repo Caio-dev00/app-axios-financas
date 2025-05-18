@@ -245,6 +245,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const isValid = await validateSession();
         if (!isValid) {
           await signOut();
+          setState(prev => ({
+            ...prev,
+            error: 'Sessão expirada. Faça login novamente.',
+            user: null,
+          }));
         }
       } catch (error) {
         console.debug('Error initializing auth:', error);
@@ -257,7 +262,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }));
       }
     };
-
     initializeAuth();
 
     // Set up session refresh
@@ -298,3 +302,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export default AuthProvider;

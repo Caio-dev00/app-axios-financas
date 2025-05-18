@@ -313,12 +313,12 @@ export async function getUser() {
   try {
     const hasToken = await validateToken();
     if (!hasToken) {
-      throw new Error('Usuário não autenticado');
+      // Retorna null silenciosamente se não autenticado
+      return null;
     }
-
     const { data } = await supabaseClient.get('/auth/v1/user');
     if (!data) {
-      throw new Error('Usuário não encontrado');
+      return null;
     }
     return data;
   } catch (error) {
@@ -330,7 +330,8 @@ export async function getUser() {
         ]);
       }
     }
-    throw new Error('Usuário não autenticado');
+    // Retorna null silenciosamente se não autenticado
+    return null;
   }
 }
 
@@ -338,23 +339,23 @@ export const getProfile = async (): Promise<UserProfile | null> => {
   try {
     const user = await getUser();
     if (!user?.id) {
-      throw new Error('Usuário não autenticado');
+      // Retorna null silenciosamente se não autenticado
+      return null;
     }
-
     const response = await supabaseClient.get(`/rest/v1/profiles`, {
       params: {
         select: '*',
         id: `eq.${user.id}`
       }
     });
-
     if (response.data?.[0]) {
       return response.data[0];
     }
     return null;
   } catch (error) {
     console.error('Error fetching profile:', error);
-    throw new Error('Erro ao buscar perfil');
+    // Retorna null silenciosamente se não autenticado
+    return null;
   }
 };
 
@@ -362,7 +363,7 @@ export const updateProfile = async (profile: Partial<UserProfile>): Promise<User
   try {
     const user = await getUser();
     if (!user?.id) {
-      throw new Error('Usuário não autenticado');
+      throw new Error('Sessão expirada. Faça login novamente.');
     }
 
     const response = await supabaseClient.patch(`/rest/v1/profiles`, profile, {
@@ -400,7 +401,7 @@ export const getSubscription = async (): Promise<{isPro: boolean, daysLeft: numb
   try {
     const user = await getUser();
     if (!user?.id) {
-      throw new Error('Usuário não autenticado');
+      throw new Error('Sessão expirada. Faça login novamente.');
     }
 
     const response = await supabaseClient.get(`/rest/v1/user_subscriptions`, {
@@ -436,3 +437,5 @@ export const getSubscription = async (): Promise<{isPro: boolean, daysLeft: numb
     };
   }
 };
+
+export default getProfile;
