@@ -11,6 +11,7 @@ import {
 	Alert,
 	FlatList,
 	Modal,
+	Platform,
 	ScrollView,
 	StyleSheet,
 	TextInput,
@@ -569,20 +570,23 @@ export default function TransactionsScreen() {
 									/>
 								) : (
 									<View style={styles.pickerWrapper}>
-										<Picker
-											selectedValue={form.category}
-											onValueChange={(v: string) => setForm((f) => ({ ...f, category: v }))}
-											style={{ color: form.category ? theme.text : theme.gray }}
-										>
-											<Picker.Item label="Selecione uma categoria" value="" color={theme.gray} />
-											{CATEGORIAS_DESPESA.map((cat) => (
-												<Picker.Item
-													key={cat.value}
-													label={cat.label}
-													value={cat.value}
-												/>
-											))}
-										</Picker>
+										<ThemedView style={{ flex: 1 }}>
+											<Picker
+												selectedValue={form.category}
+												onValueChange={(v: string) => setForm((f) => ({ ...f, category: v }))}
+												style={{ color: form.category ? theme.text : theme.gray }}
+												itemStyle={{ fontFamily: 'System', fontSize: 15 }}
+											>
+												<Picker.Item label="Selecione uma categoria" value="" color={theme.gray} />
+												{CATEGORIAS_DESPESA.map((cat) => (
+													<Picker.Item
+														key={cat.value}
+														label={cat.label}
+														value={cat.value}
+													/>
+												))}
+											</Picker>
+										</ThemedView>
 									</View>
 								)}								<View style={[styles.inputModern, { flexDirection: 'row', alignItems: 'center' }]}>
 									<ThemedText style={{ marginRight: 8, fontSize: 15, color: theme.text }}>
@@ -614,25 +618,64 @@ export default function TransactionsScreen() {
 										{form.date ? form.date.split('-').reverse().join('/') : 'Selecione a data'}
 									</ThemedText>
 									<Ionicons name="calendar-outline" size={20} color={theme.tint} />
-								</TouchableOpacity>
-
-								{showDatePicker && (
-									<DateTimePicker
-										value={form.date ? new Date(form.date) : new Date()}
-										mode="date"
-										display="default"
-										onChange={(_, selectedDate) => {
-											setShowDatePicker(false);
-											if (selectedDate) {
-												const yyyy = selectedDate.getFullYear();
-												const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
-												const dd = String(selectedDate.getDate()).padStart(2, '0');
-												setForm((f) => ({ ...f, date: `${yyyy}-${mm}-${dd}` }));
-											}
-										}}
-										maximumDate={new Date(2100, 11, 31)}
-										minimumDate={new Date(2000, 0, 1)}
-									/>
+								</TouchableOpacity>								{showDatePicker && (
+									<ThemedView style={{ position: 'relative', zIndex: 1000 }}>
+										{Platform.OS === 'ios' ? (
+											<ThemedView style={{ backgroundColor: theme.card, borderRadius: 12, padding: 8 }}>
+												<DateTimePicker
+													testID="datePicker"
+													value={form.date ? new Date(form.date) : new Date()}
+													mode="date"
+													display="spinner"
+													onChange={(_, selectedDate) => {
+														if (selectedDate) {
+															const yyyy = selectedDate.getFullYear();
+															const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+															const dd = String(selectedDate.getDate()).padStart(2, '0');
+															setForm((f) => ({ ...f, date: `${yyyy}-${mm}-${dd}` }));
+														}
+													}}
+													maximumDate={new Date(2100, 11, 31)}
+													minimumDate={new Date(2000, 0, 1)}
+													textColor={theme.text}
+													themeVariant={isDark ? 'dark' : 'light'}
+													locale="pt-BR"
+												/>
+												<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+													<TouchableOpacity 
+														onPress={() => setShowDatePicker(false)}
+														style={{ padding: 8 }}
+													>
+														<ThemedText style={{ color: theme.error, fontWeight: '500' }}>Cancelar</ThemedText>
+													</TouchableOpacity>
+													<TouchableOpacity 
+														onPress={() => setShowDatePicker(false)}
+														style={{ padding: 8 }}
+													>
+														<ThemedText style={{ color: theme.tint, fontWeight: '500' }}>OK</ThemedText>
+													</TouchableOpacity>
+												</View>
+											</ThemedView>
+										) : (
+											<DateTimePicker
+												testID="datePicker"
+												value={form.date ? new Date(form.date) : new Date()}
+												mode="date"
+												display="default"
+												onChange={(_, selectedDate) => {
+													setShowDatePicker(false);
+													if (selectedDate) {
+														const yyyy = selectedDate.getFullYear();
+														const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+														const dd = String(selectedDate.getDate()).padStart(2, '0');
+														setForm((f) => ({ ...f, date: `${yyyy}-${mm}-${dd}` }));
+													}
+												}}
+												maximumDate={new Date(2100, 11, 31)}
+												minimumDate={new Date(2000, 0, 1)}
+											/>
+										)}
+									</ThemedView>
 								)}
 
 								{form.type === "expense" && (
