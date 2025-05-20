@@ -24,6 +24,7 @@ import { useTransactions } from "../TransactionsContext";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { currencyFormats } from "../services/currencyService";
 import type { Transaction } from "../supabaseClient";
+import categoryIcons from '../utils/categoryIcons';
 
 const CATEGORIAS_DESPESA = [
 	{ label: "Alimentação", value: "Alimentação" },
@@ -370,16 +371,24 @@ export default function TransactionsScreen() {
 				setConvertedAmount(converted);
 			};
 			updateAmount();
-		}, [item.amount]); // Corrigido para reagir à mudança de currency
+		}, [item.amount]);
+
+		// Definir ícone correto para cada tipo/categoria
+		let iconName: keyof typeof Ionicons.glyphMap = 'pricetag-outline';
+		if (item.type === 'income') {
+			iconName = categoryIcons[(item.source || '').trim()] || 'cash-outline';
+		} else {
+			iconName = categoryIcons[(item.category || '').trim()] || 'pricetag-outline';
+		}
 
 		return (
 			<View style={styles.transactionCard}>
 				<View style={styles.cardLeft}>
 					<View style={styles.cardIconWrap}>
 						<Ionicons
-							name={item.type === "income" ? "cash-outline" : "cart-outline"}
+							name={iconName}
 							size={28}
-							color={item.type === "income" ? theme.tint : theme.error}
+							color={item.type === 'income' ? theme.tint : theme.error}
 						/>
 					</View>
 					<View style={styles.cardInfo}>

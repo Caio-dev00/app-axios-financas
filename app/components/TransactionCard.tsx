@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { ThemedText } from '../../components/ThemedText';
 import { useCurrency } from '../contexts/CurrencyContext';
 import type { Transaction } from '../supabaseClient';
+import categoryIcons from '../utils/categoryIcons';
 
 type TransactionCardProps = {
   transaction: Transaction;
@@ -13,21 +14,6 @@ type TransactionCardProps = {
     card: string;
     text: string;
   };
-};
-
-// Mapeamento de ícones para categorias de despesa
-const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
-  'Alimentação': 'fast-food-outline',
-  'Transporte': 'car-outline',
-  'Moradia': 'home-outline',
-  'Saúde': 'heart-outline',
-  'Educação': 'school-outline',
-  'Lazer': 'game-controller-outline',
-  'Vestuário': 'shirt-outline',
-  'Serviços': 'construct-outline',
-  'Compras': 'cart-outline',
-  'Viagens': 'airplane-outline',
-  'Outros': 'pricetag-outline',
 };
 
 export const TransactionCard = ({ transaction: tx, theme }: TransactionCardProps) => {

@@ -316,7 +316,11 @@ export async function getUser() {
       // Retorna null silenciosamente se não autenticado
       return null;
     }
-    const { data } = await supabaseClient.get('/auth/v1/user');
+    const token = await SecureStore.getItemAsync('supabase_token');
+    if (!token) return null;
+    const { data } = await supabaseClient.get('/auth/v1/user', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
     if (!data) {
       return null;
     }
