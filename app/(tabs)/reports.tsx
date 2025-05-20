@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SimplePieChart from '../components/SimplePieChart';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { type Transaction, getTransacoes } from "../supabaseClient";
+import { useTransactions } from "../TransactionsContext";
 
 // Definindo tipos
 type TimeRange = "week" | "month" | "year";
@@ -45,7 +45,34 @@ export default function ReportsScreen() {
   const isDark = colorScheme === 'dark';
   const theme = Colors[isDark ? 'dark' : 'light'];
   const { currency, formatCurrency, convertAmount } = useCurrency();
+  const { transactions } = useTransactions(); // removed 'loading' as it's unused
 
+  const today = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+
+  // Helper: filter transactions by selected period
+  const getFilteredTransactions = React.useCallback(() => {
+    if (!Array.isArray(transactions)) return [];
+    if (selectedRange === 'month') {
+      return transactions.filter((tx) => {
+        const date = dayjs(tx.date);
+        return date.year() === selectedYear && date.month() === selectedMonth;
+      });
+    } else if (selectedRange === 'year') {
+      return transactions.filter((tx) => dayjs(tx.date).year() === selectedYear);
+    } else if (selectedRange === 'week') {
+      const currentWeek = dayjs().isoWeek();
+      return transactions.filter((tx) => {
+        const date = dayjs(tx.date);
+        return date.year() === selectedYear && date.month() === selectedMonth && date.isoWeek() === currentWeek;
+      });
+    }
+    return transactions;
+  }, [transactions, selectedRange, selectedMonth, selectedYear]);
+
+  // Derived state: categories, summary, converted values
   const [categories, setCategories] = useState<Category[]>([]);
   const [summary, setSummary] = useState({ income: 0, expense: 0, balance: 0 });
   const [convertedValues, setConvertedValues] = useState({
@@ -54,140 +81,71 @@ export default function ReportsScreen() {
     balance: 0,
   });
 
-  const today = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
-  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
-  const [showMonthPicker, setShowMonthPicker] = useState(false);
-
-  // Utilitário para filtrar por semana do mês
-  function filterByWeek(transactions: Transaction[], year: number, month: number) {
-    const currentWeek = dayjs().isoWeek();
-    return transactions.filter((tx) => {
-      const date = dayjs(tx.date);
-      return date.year() === year && date.month() === month && date.isoWeek() === currentWeek;
-    });
-  }
-
-  // Buscar e processar transações
+  // Recalculate on every relevant change
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const transacoes: Transaction[] = await getTransacoes();
-        let filtered: Transaction[] = [];
-        if (selectedRange === 'month') {
-          filtered = transacoes.filter((tx) => {
-            const date = dayjs(tx.date);
-            return date.year() === selectedYear && date.month() === selectedMonth;
-          });
-        } else if (selectedRange === 'year') {
-          filtered = transacoes.filter((tx) => dayjs(tx.date).year() === selectedYear);
-        } else if (selectedRange === 'week') {
-          filtered = filterByWeek(transacoes, selectedYear, selectedMonth);
+    const filtered = getFilteredTransactions();
+    // Group by category and calculate totals in BRL
+    const catMap: Record<string, { name: string; amount: number; icon: string }> = {};
+    let totalIncome = 0;
+    let totalExpense = 0;
+    const categoryIcons = {
+      Alimentação: 'fast-food-outline',
+      Transporte: 'car-outline',
+      Moradia: 'home-outline',
+      Entretenimento: 'film-outline',
+      Saúde: 'medical-outline',
+      Educação: 'school-outline',
+      Compras: 'cart-outline',
+      Viagens: 'airplane-outline',
+      Serviços: 'construct-outline',
+      Outros: 'pricetag-outline',
+    };
+    for (const tx of filtered) {
+      if (tx.type === 'income') {
+        totalIncome += tx.amount || 0;
+      }
+      if (tx.type === 'expense') {
+        totalExpense += tx.amount || 0;
+        const cat = tx.category || 'Outros';
+        if (!catMap[cat]) {
+          const icon = categoryIcons[cat as keyof typeof categoryIcons] || 'pricetag-outline';
+          catMap[cat] = { name: cat, amount: 0, icon };
         }
-
-        // Agrupar por categoria e calcular totais em BRL
-        const catMap: Record<string, { name: string; amount: number; icon: string }> = {};
-        let totalIncome = 0;
-        let totalExpense = 0;
-        const categoryIcons = {
-          Alimentação: 'fast-food-outline',
-          Transporte: 'car-outline',
-          Moradia: 'home-outline',
-          Entretenimento: 'film-outline',
-          Saúde: 'medical-outline',
-          Educação: 'school-outline',
-          Compras: 'cart-outline',
-          Viagens: 'airplane-outline',
-          Serviços: 'construct-outline',
-          Outros: 'pricetag-outline',
-        };
-
-        for (const tx of filtered) {
-          if (tx.type === 'income') {
-            totalIncome += tx.amount || 0;
-          }
-          if (tx.type === 'expense') {
-            totalExpense += tx.amount || 0;
-            const cat = tx.category || 'Outros';
-            if (!catMap[cat]) {
-              const icon = categoryIcons[cat as keyof typeof categoryIcons] || 'pricetag-outline';
-              catMap[cat] = { name: cat, amount: 0, icon };
-            }
-            catMap[cat].amount += tx.amount || 0;
-          }
-        }
-
-        const catArr = Object.entries(catMap).map(([id, v]) => ({ id, ...v }));
-        const total = totalIncome - totalExpense;
-
-        setCategories(catArr);
-        setSummary({ income: totalIncome, expense: totalExpense, balance: total });
-      } catch (error) {
-        console.error('Error fetching transactions:', error);
-        setCategories([]);
-        setSummary({ income: 0, expense: 0, balance: 0 });
+        catMap[cat].amount += tx.amount || 0;
       }
     }
-    fetchData();
-  }, [selectedMonth, selectedYear, selectedRange]);
+    const catArr = Object.entries(catMap).map(([id, v]) => ({ id, ...v }));
+    // O resumo agora reflete apenas o período filtrado (mês, semana ou ano)
+    const total = totalIncome - totalExpense;
+    setCategories(catArr);
+    setSummary({ income: totalIncome, expense: totalExpense, balance: total });
+  }, [getFilteredTransactions]);
 
-  // Função para converter valores de forma segura
-  const safeConvert = React.useCallback(async (value: number, fromCurrency: any, toCurrency: any): Promise<number> => {
-    if (!value || isNaN(value)) return 0;
-    if (fromCurrency === toCurrency) return value;
-    try {
-      const converted = await convertAmount(value, fromCurrency, toCurrency);
-      return typeof converted === 'number' && !isNaN(converted) ? converted : value;
-    } catch (e) {
-      console.error(`Erro na conversão de moeda (${fromCurrency} → ${toCurrency}):`, e);
-      return value;
-    }
-  }, [convertAmount]);
-
-  // Atualizar totais convertidos
-  const updateTotals = React.useCallback(async () => {
-    try {
-      if (!summary) {
-        setConvertedValues({ totalIncome: 0, totalExpense: 0, balance: 0 });
-        return;
-      }
+  // Convert values to selected currency
+  useEffect(() => {
+    let isMounted = true;
+    async function updateTotals() {
       const income = typeof summary.income === 'number' ? summary.income : 0;
       const expense = typeof summary.expense === 'number' ? summary.expense : 0;
-      const totalIncome = await safeConvert(income, 'BRL', currency);
-      const totalExpense = await safeConvert(expense, 'BRL', currency);
+      const totalIncome = await convertAmount(income, 'BRL', currency);
+      const totalExpense = await convertAmount(expense, 'BRL', currency);
       const balance = totalIncome - totalExpense;
-      setConvertedValues({ totalIncome, totalExpense, balance });
-
+      if (isMounted) setConvertedValues({ totalIncome, totalExpense, balance });
+      // Corrige: cria um novo array convertido para não sobrescrever o array base
       if (Array.isArray(categories) && categories.length > 0) {
-        try {
-          const updatedCategories = await Promise.all(
-            categories.map(async (cat) => {
-              if (!cat || typeof cat !== 'object') {
-                return { id: 'unknown', name: 'Desconhecido', amount: 0, icon: 'help-outline' };
-              }
-              const safeAmount = typeof cat.amount === 'number' && !isNaN(cat.amount) ? cat.amount : 0;
-              const convertedAmount = await safeConvert(safeAmount, 'BRL', currency);
-              return { ...cat, amount: convertedAmount };
-            })
-          );
-          setCategories(updatedCategories);
-        } catch (e) {
-          console.error('Erro ao processar categorias:', e);
-        }
+        const updatedCategories = await Promise.all(
+          categories.map(async (cat) => {
+            const safeAmount = typeof cat.amount === 'number' && !isNaN(cat.amount) ? cat.amount : 0;
+            const convertedAmount = await convertAmount(safeAmount, 'BRL', currency);
+            return { ...cat, amount: convertedAmount };
+          })
+        );
+        if (isMounted) setCategories(updatedCategories);
       }
-    } catch (error) {
-      console.error('Erro ao converter valores:', error);
-      setConvertedValues({
-        totalIncome: summary?.income || 0,
-        totalExpense: summary?.expense || 0,
-        balance: (summary?.income || 0) - (summary?.expense || 0),
-      });
     }
-  }, [summary, currency, categories, safeConvert]);
-
-  useEffect(() => {
     updateTotals();
-  }, [updateTotals]);
+    return () => { isMounted = false; };
+  }, [summary, currency, categories, convertAmount]);
 
   // Renderizadores auxiliares
   const renderTimeRangeSelector = () => (
@@ -243,15 +201,35 @@ export default function ReportsScreen() {
   );
 
   const renderCategoryBreakdown = () => {
-    if (!categories || categories.length === 0 || categories.every((cat) => !cat || cat.amount <= 0)) {
-      return (
-        <View style={[styles.categoryCard, { backgroundColor: theme.card }]}> 
-          <ThemedText style={[styles.categoryTitle, { color: theme.text }]}>Despesas por Categoria</ThemedText>
-          <ThemedText style={[styles.emptyMessage, { color: theme.gray }]}>Nenhuma despesa registrada no período</ThemedText>
-        </View>
-      );
+    // Use sempre os dados filtrados do período selecionado
+    const filtered = getFilteredTransactions();
+    // Agrupa as despesas por categoria do período filtrado
+    const catMap: Record<string, { name: string; amount: number; icon: string }> = {};
+    const categoryIcons = {
+      Alimentação: 'fast-food-outline',
+      Transporte: 'car-outline',
+      Moradia: 'home-outline',
+      Entretenimento: 'film-outline',
+      Saúde: 'medical-outline',
+      Educação: 'school-outline',
+      Compras: 'cart-outline',
+      Viagens: 'airplane-outline',
+      Serviços: 'construct-outline',
+      Outros: 'pricetag-outline',
+    };
+    for (const tx of filtered) {
+      if (tx.type === 'expense') {
+        const cat = tx.category || 'Outros';
+        if (!catMap[cat]) {
+          const icon = categoryIcons[cat as keyof typeof categoryIcons] || 'pricetag-outline';
+          catMap[cat] = { name: cat, amount: 0, icon };
+        }
+        catMap[cat].amount += tx.amount || 0;
+      }
     }
-    const validCategories = categories.filter((cat) => cat && typeof cat.amount === 'number' && cat.amount > 0);
+    const validCategories = Object.entries(catMap)
+      .map(([id, v]) => ({ id, ...v }))
+      .filter((cat) => cat && typeof cat.amount === 'number' && cat.amount > 0);
     const sortedCategories = [...validCategories].sort((a, b) => (b.amount || 0) - (a.amount || 0));
     const total = sortedCategories.reduce((sum, cat) => sum + Math.max(0, cat.amount || 0), 0);
     const chartData = sortedCategories.map((cat, index) => ({
@@ -259,7 +237,14 @@ export default function ReportsScreen() {
       value: Math.max(0.01, cat.amount),
       color: chartColors[index % chartColors.length],
     }));
-
+    if (sortedCategories.length === 0 || total === 0) {
+      return (
+        <View style={[styles.categoryCard, { backgroundColor: theme.card }]}> 
+          <ThemedText style={[styles.categoryTitle, { color: theme.text }]}>Despesas por Categoria</ThemedText>
+          <ThemedText style={[styles.emptyMessage, { color: theme.gray }]}>Nenhuma despesa registrada no período</ThemedText>
+        </View>
+      );
+    }
     return (
       <View style={[styles.categoryCard, { backgroundColor: theme.card }]}> 
         <ThemedText style={[styles.categoryTitle, { color: theme.text }]}>Despesas por Categoria</ThemedText>
@@ -270,35 +255,29 @@ export default function ReportsScreen() {
         )}
         <ThemedText style={[styles.sectionTitle, { color: theme.text, marginTop: 5 }]}>Detalhamento por Categoria</ThemedText>
         <View style={styles.categoryList}>
-          {sortedCategories.length > 0 ? (
-            sortedCategories.map((category, index) => {
-              const safeAmount = Math.max(category.amount || 0, 0.01);
-              const percentage = total > 0 ? ((safeAmount / total) * 100).toFixed(1) : '0.0';
-              const safeIcon = category.icon && typeof category.icon === 'string' ? category.icon : 'pricetag-outline';
-              return (
-                <View key={category.id || `cat-${index}`} style={styles.categoryItem}>
-                  <View style={styles.categoryInfo}>
-                    <View style={[styles.categoryIcon, { backgroundColor: chartColors[index % chartColors.length] }]}> 
-                      <Ionicons name={safeIcon as keyof typeof Ionicons.glyphMap} size={20} color="#fff" />
-                    </View>
-                    <View>
-                      <ThemedText style={[styles.categoryName, { color: theme.text }]}>{category.name || 'Categoria'}</ThemedText>
-                      <ThemedText style={[styles.categoryPercentage, { color: theme.gray }]}>{percentage}%</ThemedText>
-                    </View>
+          {sortedCategories.map((category, index) => {
+            const safeAmount = Math.max(category.amount || 0, 0.01);
+            const percentage = total > 0 ? ((safeAmount / total) * 100).toFixed(1) : '0.0';
+            const safeIcon = category.icon && typeof category.icon === 'string' ? category.icon : 'pricetag-outline';
+            return (
+              <View key={category.id || `cat-${index}`} style={styles.categoryItem}>
+                <View style={styles.categoryInfo}>
+                  <View style={[styles.categoryIcon, { backgroundColor: chartColors[index % chartColors.length] }]}> 
+                    <Ionicons name={safeIcon as keyof typeof Ionicons.glyphMap} size={20} color="#fff" />
                   </View>
-                  <ThemedText style={[styles.categoryAmount, { color: theme.text }]}>{formatCurrency(safeAmount)}</ThemedText>
+                  <View>
+                    <ThemedText style={[styles.categoryName, { color: theme.text }]}>{category.name || 'Categoria'}</ThemedText>
+                    <ThemedText style={[styles.categoryPercentage, { color: theme.gray }]}>{percentage}%</ThemedText>
+                  </View>
                 </View>
-              );
-            })
-          ) : (
-            <ThemedText style={[styles.emptyMessage, { color: theme.gray }]}>Nenhuma categoria com gastos registrados</ThemedText>
-          )}
-          {validCategories.length > 0 && (
-            <View style={[styles.totalRow, { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}> 
-              <ThemedText style={[styles.totalLabel, { color: theme.text }]}>Total de Despesas</ThemedText>
-              <ThemedText style={[styles.totalAmount, { color: theme.error }]}>{formatCurrency(total)}</ThemedText>
-            </View>
-          )}
+                <ThemedText style={[styles.categoryAmount, { color: theme.text }]}>{formatCurrency(safeAmount)}</ThemedText>
+              </View>
+            );
+          })}
+          <View style={[styles.totalRow, { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}> 
+            <ThemedText style={[styles.totalLabel, { color: theme.text }]}>Total de Despesas</ThemedText>
+            <ThemedText style={[styles.totalAmount, { color: theme.error }]}>{formatCurrency(total)}</ThemedText>
+          </View>
         </View>
       </View>
     );

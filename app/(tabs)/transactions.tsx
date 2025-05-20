@@ -370,7 +370,7 @@ export default function TransactionsScreen() {
 				setConvertedAmount(converted);
 			};
 			updateAmount();
-		}, [item.amount, currency]); // Corrigido para reagir à mudança de currency
+		}, [item.amount]); // Corrigido para reagir à mudança de currency
 
 		return (
 			<View style={styles.transactionCard}>
