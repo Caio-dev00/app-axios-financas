@@ -309,68 +309,47 @@ export default function ReportsScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'bottom', 'left', 'right']}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 2 }}>
         <TouchableOpacity
-          style={[styles.monthPickerButton, { backgroundColor: theme.tint }]}
+          style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.tint, borderRadius: 18, paddingHorizontal: 18, paddingVertical: 8 }}
           onPress={() => setShowMonthPicker(true)}
           activeOpacity={0.85}
         >
-          <Ionicons name="calendar-outline" size={18} color={theme.text} style={{ marginRight: 8 }} />
-          <ThemedText style={[styles.monthText, { color: theme.text }]}>  
-            {(MONTHS && selectedMonth >= 0 && selectedMonth < MONTHS.length)
-              ? `${MONTHS[selectedMonth]} ${selectedYear}`
-              : `MÊS ${selectedYear}`}
-          </ThemedText>
-          <Ionicons name="chevron-down" size={18} color={theme.text} style={{ marginLeft: 8 }} />
+          <Ionicons name="calendar-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+          <ThemedText style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{MONTHS[selectedMonth]} {selectedYear}</ThemedText>
+          <Ionicons name="chevron-down" size={18} color="#fff" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
       </View>
       <Modal visible={showMonthPicker} animationType="fade" transparent>
-        <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, { backgroundColor: theme.card }]}> 
-            <View style={[styles.modalHeader, { backgroundColor: theme.tint }]}> 
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 24, width: '90%', maxWidth: 400, paddingBottom: 18, overflow: 'hidden' }}>
+            {/* Header de navegação de ano */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.tint, paddingVertical: 18, paddingHorizontal: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
               <TouchableOpacity onPress={() => setSelectedYear((y) => y - 1)}>
-                <Ionicons name="chevron-back" size={26} color={theme.text} />
+                <Ionicons name="chevron-back" size={26} color="#fff" />
               </TouchableOpacity>
-              <ThemedText style={[styles.modalHeaderText, { color: theme.text }]}>
-                {selectedYear}
-              </ThemedText>
+              <ThemedText style={{ color: '#fff', fontWeight: 'bold', fontSize: 18 }}>{selectedYear}</ThemedText>
               <TouchableOpacity onPress={() => setSelectedYear((y) => y + 1)}>
-                <Ionicons name="chevron-forward" size={26} color={theme.text} />
+                <Ionicons name="chevron-forward" size={26} color="#fff" />
               </TouchableOpacity>
             </View>
-            <View style={[styles.modalGrid, { backgroundColor: isDark ? theme.background : '#f6f6f7' }]}> 
-              {(MONTHS || []).map((m, idx) => (
+            {/* Grid de meses */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', padding: 18, backgroundColor: '#f6f6f7' }}>
+              {MONTHS.map((m, idx) => (
                 <TouchableOpacity
-                  key={m || `month-${idx}`}
-                  style={[
-                    styles.modalGridItem,
-                    {
-                      backgroundColor: idx === selectedMonth ? theme.tint : theme.card,
-                      shadowColor: idx === selectedMonth ? theme.tint : 'transparent',
-                      shadowOpacity: idx === selectedMonth ? 0.12 : 0,
-                      shadowRadius: 6,
-                      elevation: idx === selectedMonth ? 2 : 0,
-                    },
-                  ]}
-                  onPress={() => {
-                    setSelectedMonth(idx);
-                    setShowMonthPicker(false);
-                  }}
+                  key={m}
+                  style={{ width: '30%', marginVertical: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: idx === selectedMonth ? theme.tint : '#fff', paddingVertical: 12, shadowColor: idx === selectedMonth ? theme.tint : 'transparent', shadowOpacity: idx === selectedMonth ? 0.12 : 0, shadowRadius: 6, elevation: idx === selectedMonth ? 2 : 0 }}
+                  onPress={() => { setSelectedMonth(idx); setShowMonthPicker(false); }}
                   activeOpacity={0.85}
                 >
-                  <ThemedText style={{ color: idx === selectedMonth ? theme.text : theme.text, fontWeight: idx === selectedMonth ? 'bold' : 'normal', fontSize: 15 }}>
-                    {typeof m === 'string' || typeof m === 'number' ? m : ''}
-                  </ThemedText>
+                  <ThemedText style={{ color: idx === selectedMonth ? '#fff' : theme.text, fontWeight: idx === selectedMonth ? 'bold' : 'normal', fontSize: 15 }}>{m}</ThemedText>
                 </TouchableOpacity>
               ))}
             </View>
+            {/* Ações */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, marginTop: 2 }}>
               <TouchableOpacity onPress={() => setShowMonthPicker(false)}>
                 <ThemedText style={{ color: theme.tint, fontWeight: 'bold', fontSize: 15, paddingVertical: 10 }}>CANCELAR</ThemedText>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => {
-                setSelectedMonth(today.getMonth());
-                setSelectedYear(today.getFullYear());
-                setShowMonthPicker(false);
-              }}>
+              <TouchableOpacity onPress={() => { setSelectedMonth(today.getMonth()); setSelectedYear(today.getFullYear()); setShowMonthPicker(false); }}>
                 <ThemedText style={{ color: theme.tint, fontWeight: 'bold', fontSize: 15, paddingVertical: 10 }}>MÊS ATUAL</ThemedText>
               </TouchableOpacity>
             </View>

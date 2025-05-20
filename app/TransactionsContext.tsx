@@ -33,12 +33,18 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
+  // Garante que erros sejam sempre string segura para UI
+  const errorMessage = (msg: unknown) => {
+    if (typeof msg === 'string') return msg;
+    if (msg instanceof Error) return msg.message;
+    return String(msg ?? 'Erro desconhecido');
+  };
+
   const fetchTransactions = useCallback(async () => {
     if (!user) {
       setState(prev => ({ ...prev, transactions: [], loading: false }));
       return;
     }
-
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       const data = await getTransacoes();
@@ -53,7 +59,7 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : 'Erro ao carregar transações'
+        error: errorMessage(error)
       }));
     }
   }, [user]);
@@ -84,7 +90,7 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : 'Erro ao adicionar transação'
+        error: errorMessage(error)
       }));
       throw error;
     }
@@ -99,7 +105,7 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : 'Erro ao atualizar transação'
+        error: errorMessage(error)
       }));
       throw error;
     }
@@ -118,7 +124,7 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : 'Erro ao excluir transação'
+        error: errorMessage(error)
       }));
       throw error;
     }

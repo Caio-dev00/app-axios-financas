@@ -9,19 +9,21 @@ export type ThemedTextProps = TextProps & {
   type?: 'default' | 'title' | 'defaultSemiBold' | 'subtitle' | 'link';
 };
 
-// Função para verificar se a children prop é segura para renderizar 
-const ensureSafeChildren = (children: any) => {
+// Função para garantir que children é seguro para <Text>
+const ensureSafeChildren = (children: any): React.ReactNode => {
   if (children === null || children === undefined) {
     return null;
   }
-  
-  // Já está seguro caso seja ReactNode ou string
-  if (typeof children === 'string' || typeof children === 'number' || 
-      React.isValidElement(children) || Array.isArray(children)) {
+  if (typeof children === 'string' || typeof children === 'number') {
     return children;
   }
-  
-  // Converte para string segura caso seja um tipo não compatível
+  if (Array.isArray(children)) {
+    return children.map((child, idx) => ensureSafeChildren(child));
+  }
+  if (React.isValidElement(children)) {
+    return children;
+  }
+  // fallback para string
   return String(children);
 };
 
@@ -34,10 +36,7 @@ export function ThemedText({
   ...rest
 }: ThemedTextProps) {
   const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
-  
-  // Garantir que o children é renderizável de forma segura
   const safeChildren = ensureSafeChildren(children);
-
   return (
     <Text
       style={[

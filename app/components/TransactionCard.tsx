@@ -27,6 +27,13 @@ export const TransactionCard = ({ transaction: tx, theme }: TransactionCardProps
     updateAmount();
   }, [tx.amount, currency, convertAmount]);
 
+  // Garantir que todos os textos são strings seguras
+  const safeTitle = tx.title?.trim() ? String(tx.title) : 'Sem título';
+  const safeCategory = tx.type === 'income'
+    ? (tx.source?.trim() ? String(tx.source) : 'Sem categoria')
+    : (tx.category?.trim() ? String(tx.category) : 'Sem categoria');
+  const safeDate = tx.date ? String(tx.date) : '';
+
   return (
     <View
       style={[
@@ -43,14 +50,12 @@ export const TransactionCard = ({ transaction: tx, theme }: TransactionCardProps
       </View>
       <View style={styles.cardInfo}>
         <ThemedText style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
-          {tx.title?.trim() ? tx.title : "Sem título"}
+          {safeTitle}
         </ThemedText>
         <ThemedText style={styles.cardCategory} numberOfLines={1} ellipsizeMode="tail">
-          {tx.type === "income"
-            ? (tx.source?.trim() ? tx.source : "Sem categoria")
-            : (tx.category?.trim() ? tx.category : "Sem categoria")}
+          {safeCategory}
         </ThemedText>
-        <ThemedText style={styles.cardDate}>{tx.date}</ThemedText>
+        <ThemedText style={styles.cardDate}>{safeDate}</ThemedText>
       </View>
       <ThemedText
         style={[

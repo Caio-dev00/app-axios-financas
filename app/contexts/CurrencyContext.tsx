@@ -116,8 +116,16 @@ export function CurrencyProvider({ children }: CurrencyProviderProps) {
     }
   };
 
+  // Garante que valores passados para formatCurrency sejam sempre número
+  const safeFormatCurrency = (amount: unknown, currencyCode?: CurrencyCode) => {
+    let value = 0;
+    if (typeof amount === 'number' && !isNaN(amount)) value = amount;
+    else if (typeof amount === 'string') value = parseFloat(amount.replace(',', '.'));
+    return formatCurrencyUtil(value, currencyCode || currency);
+  };
+
   const formatCurrency = (amount: number, currencyCode?: CurrencyCode) => {
-    return formatCurrencyUtil(amount, currencyCode || currency);
+    return safeFormatCurrency(amount, currencyCode);
   };
 
   return (

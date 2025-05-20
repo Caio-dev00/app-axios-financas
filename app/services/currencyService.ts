@@ -103,17 +103,18 @@ export const getCachedRates = async (): Promise<Record<CurrencyCode, number> | n
 };
 
 export const formatCurrency = (
-  amount: number,
+  amount: number | string,
   currencyCode: CurrencyCode = 'BRL'
 ): string => {
+  let value = 0;
+  if (typeof amount === 'number' && !isNaN(amount)) value = amount;
+  else if (typeof amount === 'string') value = parseFloat((amount as string).replace(',', '.'));
   const format = currencyFormats[currencyCode];
-  
-  const formattedNumber = Math.abs(amount)
+  const formattedNumber = Math.abs(value)
     .toFixed(format.decimalPlaces)
     .replace('.', format.decimalSeparator)
     .replace(/\B(?=(\d{3})+(?!\d))/g, format.thousandsSeparator);
-  
-  return `${amount < 0 ? '-' : ''}${format.symbol} ${formattedNumber}`;
+  return `${value < 0 ? '-' : ''}${format.symbol} ${formattedNumber}`;
 };
 
 export const getActiveCurrency = (preference?: string | null): CurrencyCode => {
