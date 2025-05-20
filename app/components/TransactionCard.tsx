@@ -15,6 +15,21 @@ type TransactionCardProps = {
   };
 };
 
+// Mapeamento de ícones para categorias de despesa
+const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
+  'Alimentação': 'fast-food-outline',
+  'Transporte': 'car-outline',
+  'Moradia': 'home-outline',
+  'Saúde': 'heart-outline',
+  'Educação': 'school-outline',
+  'Lazer': 'game-controller-outline',
+  'Vestuário': 'shirt-outline',
+  'Serviços': 'construct-outline',
+  'Compras': 'cart-outline',
+  'Viagens': 'airplane-outline',
+  'Outros': 'pricetag-outline',
+};
+
 export const TransactionCard = ({ transaction: tx, theme }: TransactionCardProps) => {
   const { currency, formatCurrency, convertAmount } = useCurrency();
   const [convertedAmount, setConvertedAmount] = useState(tx.amount);
@@ -43,7 +58,11 @@ export const TransactionCard = ({ transaction: tx, theme }: TransactionCardProps
     >
       <View style={styles.cardIconWrap}>
         <Ionicons
-          name={tx.type === "income" ? "cash-outline" : "cart-outline"}
+          name={
+            tx.type === "income"
+              ? "cash-outline"
+              : categoryIcons[(tx.category || '').trim()] || 'pricetag-outline'
+          }
           size={28}
           color={tx.type === "income" ? theme.tint : theme.error}
         />

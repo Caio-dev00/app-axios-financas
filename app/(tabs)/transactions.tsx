@@ -590,12 +590,13 @@ export default function TransactionsScreen() {
 										</ThemedView>
 									</View>
 								)}
-								<View style={[styles.inputModern, { flexDirection: 'row', alignItems: 'center' }]}>
-									<ThemedText style={{ marginRight: 8, fontSize: 15, color: theme.text }}>
+								{/* Input de valor com símbolo da moeda alinhado e centralizado */}
+								<View style={[styles.inputModern, { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingLeft: 16, paddingRight: 12, justifyContent: 'flex-start' }]}> 
+									<ThemedText style={{ marginRight: 8, fontSize: 16, color: theme.text, minWidth: 28, textAlign: 'left' }}>
 										{currencyFormats[currency].symbol}
 									</ThemedText>
 									<TextInput
-										style={[styles.input, { flex: 1, borderWidth: 0, padding: 0, margin: 0, backgroundColor: 'transparent' }]}
+										style={{ flex: 1, fontSize: 16, color: theme.text, backgroundColor: 'transparent', borderWidth: 0, padding: 0, margin: 0, textAlignVertical: 'center' }}
 										placeholder="0,00"
 										placeholderTextColor={theme.gray}
 										value={form.amountStr ?? ""}
@@ -607,7 +608,7 @@ export default function TransactionsScreen() {
 										}}
 										keyboardType="decimal-pad"
 										numberOfLines={1}
-										textAlignVertical="center"
+										textAlign="left"
 									/>
 								</View>
 
